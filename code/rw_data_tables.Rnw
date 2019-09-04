@@ -1,0 +1,188 @@
+\documentclass[12pt]{article}
+
+%\usepackage{times}
+\usepackage{hyperref}
+\hypersetup{pdfpagemode=UseNone} % don't show bookmarks on initial view
+\hypersetup{colorlinks, urlcolor={blue}}
+
+% revise margins
+\setlength{\headheight}{0.0in}
+\setlength{\topmargin}{0.0in}
+\setlength{\headsep}{0.0in}
+\setlength{\textheight}{8.65in}
+\setlength{\footskip}{0.35in}
+\setlength{\oddsidemargin}{0.0in}
+\setlength{\evensidemargin}{0.0in}
+\setlength{\textwidth}{6.5in}
+
+\setlength{\parskip}{6pt}
+\setlength{\parindent}{0pt}
+
+\begin{document}
+
+%\sffamily
+{\textbf{Gestational Age Prediction Using Stochastic Intervention for Variable Importance}}
+
+%\href{http://kbroman.org}{Karl W Broman}
+Alejandra Benitez and the Preterm Birth Initiative
+
+%This is a portion of the ``\href{http://www.rqtl.org/rqtltour2.pdf}{A shorter tour of R/qtl}''
+%tutorial, developed here in multiple formats to illustrate the use of knitr.
+%This particular document is written with \href{http://www.latex-project.org}{LaTeX}.
+
+<<knitr_options, include=FALSE>>=
+library(knitr)
+library(here)
+library(dplyr)
+library(geepack)
+library(parsedate)
+opts_chunk$set(fig.width=12, fig.height=4, fig.path='RnwFigs/',
+warning=FALSE, message=FALSE, tidy=FALSE)
+options(width=60)
+set.seed(53079239)
+# install R/qtl package if necessary:
+if(!require("qtl")) install.packages("qtl", repos="http://cran.us.r-project.org")
+@
+
+\bigskip
+%\sffamily 
+\textbf{Abstract}
+\newline
+%\nopagebreak
+
+\textit{Results}
+
+Our preliminary results indicate good classification potential across thresholds (cvAUC 0.75-0.85) while maintaining good specificity. The results also indicate potential to estimate GA at delivery within 3 weeks. A variable importance assessment is forthcoming.
+
+\textit{Conclusions}
+
+Our preliminary data implies our algorithm could guide GA assessment for our primary outcome analysis in Rwanda. Additionally, it has future potential as a pilot in clinical use, as a means for aiding decision-making in treatment and referral for vulnerable newborns. 
+
+
+\section{Results}
+\begin{itemize}
+\item Table 1 for population, age, SES, region
+\item cvAUC, variable importance can be presented by some dot plot
+\item linear plot of predicted continuous GA vs actual to show margins of error
+\\
+
+\end{itemize}
+%
+%\textbf{Results}
+%
+You then load the R/qtl package using the {\tt library} function:
+
+%<<load_qtl>>=
+%library(qtl)
+%@
+
+
+
+<<echo=FALSE, cache=FALSE>>=
+
+fix_date = function(date) {
+
+ancdate_missing = as.Date(rep(NA, length(date)))
+
+ancdate = parse_date(as.character(date)[!is.na(date)])
+class(ancdate)
+ancdate = as.Date(ancdate, format = "%m/%d/%Y")
+ancdate_missing[!is.na(date)] <- ancdate
+
+return(ancdate_missing)
+
+}
+
+intervention = c("Rongo_Sub-County_Hospital", "Kegonga_Sub-County_Hospital", 
+"Tisinye_Health_Center", "Macalder_Sub-County_Hospital", 
+"Awendo_Sub-County_Hospital", "Bugumbe_Health_Center", 
+"Nyamaraga_Sub-County_Hospital", "St_Camillus_Mission_Hospital", 
+"Kamuli_Hospital", "Buluba_Hospital")
+
+control = c( "Kehancha_Sub-County_Hospital", "Uriri_Health_Center", 
+"Karungu_Sub-County_Hospital", "Isebania_Sub-County_Hospital", 
+"Ntimaru_Sub-County_Hospital", "Muhuru_Health_Center",
+"Othoro_Sub-County_Hospital", "St_Joseph-Ombo_Mission_Hospital", 
+"Bugiri_Hospital", "Kamuli_Mission_Hospital")
+
+@
+
+<<echo=TRUE>>=
+## marginal probability of weeks
+df = read.csv(here('data', 'FINALcohort_13Aug2019.csv'))
+table(df$dhc)
+id_arm = read.csv(here('data', 'RW_Study_ID.csv'))
+table(df$baby_status_28day)
+
+df = df %>% filter((consented == "yes" | consented  == "Yes"))
+table(df$consented, df$country)
+table(df$country)
+##make 
+#df = df %>% filter(eligible_for_followup == "Eligible for Follow-up")
+table(df$eligible_for_followup, df$country)
+table(df$eligibility_for_ptbi, df$country)
+df = df %>% filter(eligibility_for_ptbi == "Eligible")
+df = df %>% filter(facility != " " & facility != "Iganga_Hospital" &
+facility != "Migori_County_Referral_Hospital" & 
+facility != "Jinja_Regional_Ref_Hospital")
+length(unique(df$facility))
+table(df$facility_birth)
+table(df$eligible_for_followup)
+table(df$eligible_for_followupAR)
+table(df$eligibility_for_ptbi)
+table(df$eligibility_for_ptbiAR)
+table(df$country)
+
+#df = df %>% filter(baby_status_28day != "Lost_to_followup")
+df = df %>% filter(date_of_delivery != " ")
+
+
+table(df$baby_status_28day)
+df$y <- ifelse(df$baby_status_28day == "Dead" | df$baby_status_28day == "PreDischargeDeath", 1, 0)
+table(df$baby_status_28day)
+#nmr
+table(df$baby_discharge_status)
+#fsb
+table(df$birth_outcome)
+df$A = ifelse(df$facility %in% intervention, 1, 0)
+table(df$facility, df$A)
+
+@
+
+<<load_cross, echo = F>>=
+
+df$pair_correct = rep(NA, nrow(df))
+
+df$pair_correct[df$facility %in% c("Rongo_Sub-County_Hospital", "Kehancha_Sub-County_Hospital")] <- 1
+df$pair_correct[df$facility %in% c("Kegonga_Sub-County_Hospital", "Uriri_Health_Center")] <- 2
+df$pair_correct[df$facility %in% c("Tisinye_Health_Center", "Karungu_Sub-County_Hospital")] <- 3
+df$pair_correct[df$facility %in% c("Macalder_Sub-County_Hospital", "Isebania_Sub-County_Hospital")] <- 4
+df$pair_correct[df$facility %in% c("Awendo_Sub-County_Hospital", "Ntimaru_Sub-County_Hospital")] <- 5
+
+df$pair_correct[df$facility %in% c("Bugumbe_Health_Center", "Muhuru_Health_Center")] <- 6
+df$pair_correct[df$facility %in% c("Nyamaraga_Sub-County_Hospital", "Othoro_Sub-County_Hospital")] <- 7
+df$pair_correct[df$facility %in% c("St_Camillus_Mission_Hospital", "St_Joseph-Ombo_Mission_Hospital")] <- 8
+df$pair_correct[df$facility %in% c("Kamuli_Hospital", "Bugiri_Hospital")] <- 9
+df$pair_correct[df$facility %in% c("Buluba_Hospital", "Kamuli_Mission_Hospital")] <- 10
+
+#summary(df$pair_correct)
+@
+
+
+
+
+\bigskip
+{\sffamily \textbf{R and package versions used}}
+\nopagebreak
+
+
+
+
+<<sessionInfo, include=TRUE, echo=TRUE, results='markup'>>=
+sessionInfo()
+@
+
+% \bibliography{ga_pred} 
+% \bibliographystyle{ieeetr}
+
+\end{document}
