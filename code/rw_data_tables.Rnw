@@ -93,79 +93,379 @@ return(ancdate_missing)
 
 }
 
-intervention = c("Rongo_Sub-County_Hospital", "Kegonga_Sub-County_Hospital", 
-"Tisinye_Health_Center", "Macalder_Sub-County_Hospital", 
-"Awendo_Sub-County_Hospital", "Bugumbe_Health_Center", 
-"Nyamaraga_Sub-County_Hospital", "St_Camillus_Mission_Hospital", 
-"Kamuli_Hospital", "Buluba_Hospital")
+get_us = function(x, arm) {
+  study_id_enroll = x[, sprintf('study_id_full_new')]
+  #study_id_anc1 = x[, sprintf('study_id_anc')]
+  m_age_enroll = as.numeric(as.character(x[ ,'m_age']))
+  m_age_anc1 = as.numeric(x[ ,'m_age_anc'])
+  #as.numeric
+  
+  m_stature =  as.numeric(x[ , 'ht_und150'])
+  m_wt = as.numeric(x[ , 'wt_1stvisit'])
+  
+  #date_del = fix_date(x[, 'date_delivery_mat'])
+  date_del = as.Date(x[, 'date_delivery_mat'], format= "%d-%b-%y")
 
-control = c( "Kehancha_Sub-County_Hospital", "Uriri_Health_Center", 
-"Karungu_Sub-County_Hospital", "Isebania_Sub-County_Hospital", 
-"Ntimaru_Sub-County_Hospital", "Muhuru_Health_Center",
-"Othoro_Sub-County_Hospital", "St_Joseph-Ombo_Mission_Hospital", 
-"Bugiri_Hospital", "Kamuli_Mission_Hospital")
+  date_anc1 = as.Date(x[, 'anc1date_anc'], format= "%d-%b-%y")
+  days_from_anc1_to_del = (date_del - date_anc1)
+  wks_from_anc1_to_del = (date_del - date_anc1)/7
+  
+  ## LMP ##
+  lmp = as.Date(x[, sprintf('lmp_anc')], format= "%d-%b-%y")
+  
+  wks_from_lmp_to_del = (date_del - lmp) / 7
+  
+  ga_at_anc1_by_lmp = (date_anc1 - lmp) / 7
+  
+  ga_at_deliv_lmp = (ga_at_anc1_by_lmp) + (days_from_anc1_to_del / 7)
+  ## LMP ##
+  edd = as.Date(x[, sprintf('edd_anc')], format= "%d-%b-%y")
+
+  ga_at_delivery_by_edd_anc1 = (280 + (date_del - edd)) / 7
+  
+  #Question 3
+  ##GA AT DELIVERY BY GA AT ANC1 ##
+  ga_anc1_recorded = (x[, sprintf('anc1ga_anc')])
+  ga_anc1_by_edd = 40 - ((edd - date_anc1)/7)
+  ga_at_delivery_by_ga_anc1 = ga_anc1_recorded + (days_from_anc1_to_del / 7)
+  
+  
+  ###mother
+  parity = as.numeric(x[, "parity_anc"])
+  grav = as.numeric(x[, "gravidity_anc"])
+  
+  fuel = as.numeric(x[, sprintf("fuel_use")])
+  
+  enough_food = as.numeric(x[, sprintf("hh_enoughfood")])
+  ever_no_food = as.numeric(x[, sprintf("hh_evernofood")])
+  run_out_food = as.numeric(x[, sprintf("hh_runoutfood")])
+  not_enough_food = as.numeric(x[, sprintf("hh_notenoughfood")])
+  
+  smoke = as.numeric(x[, sprintf("preg_smoke")])
+  hh_smoker = as.numeric(x[, sprintf("hh_smoker")])
+  
+  alc = as.numeric(x[, sprintf("preg_alc")])
+  
+  ###mother
+  
+  
+  ## BABY
+  sex = x[, 'infant_sex']
+  muac = as.numeric(x[, sprintf('muac_birth')])
+  chest_c = as.numeric(x[, sprintf('cc_birth')])
+  weight = as.numeric(as.character(x[, sprintf('bwt_birth')]))
+  
+  weight[!is.na(weight) & (weight/10) < 1] <- (weight * 1000)[!is.na(weight) & (weight/10) < 1]
+  table(weight)
+  head_cir =  as.numeric(x[ ,sprintf('hc_birth')])
+  length_b =  as.numeric(x[ ,sprintf('length_birth')])
+  apgar1 = as.numeric(x[, sprintf('apgar_1mbirth')])
+  apgar5 = as.numeric(x[, sprintf('apgar_5mbirth')])
+  ## BABY
+   if (arm == 2 | arm == 4) {
+    #us_edd = date_cleaning(as.Date(x[, sprintf('edd_us')], format = "%Y-%m-%d"))
+    us_edd = as.Date(x[, sprintf('edd_us')], format= "%d-%b-%y")
+    
+    ga_at_us = as.numeric(as.character(x[, sprintf('us_adjga')]))
+
+    us_date =  as.Date(x[, sprintf('us_date')],format= "%d-%b-%y")
+    #us_date[140:145]
+    #x[140:145, 'us_date']
+    
+    ga_del_by_us_date = ga_at_us + (date_del - us_date)/7
+    edd_by_us_date = 7*(40 - ga_at_us) + us_date
+    
+    ga_us_diff = date_del - us_edd
+    ga_del_us = (280 + ga_us_diff) / 7
+    
+  } else {
+    ga_del_us = rep(NA, nrow(x))
+    ga_at_us = rep(NA, nrow(x))
+    us_date = rep(NA, nrow(x))
+  }
+  
+  
+  wks_from_lmp_to_us = (us_date - lmp)/7
+  wks_from_anc1_to_us = (us_date - date_anc1)/7
+  wks_from_us_to_del = (date_del - us_date)/7
+  ######## Question 5 ## GA at delivery by FH @ anc1 ### 
+  
+  ####
+  fun_ht_anc1 = as.numeric(as.character(x[, sprintf('fundalht_1stvisit')]))
+  ## check serial fundal height
+  
+  ga_at_delivery_by_fh_anc1 = fun_ht_anc1 + (days_from_anc1_to_del/7)
+  
+  ## ga weeks delivery recoded
+  ga_weeks_recorded = x[, sprintf('ga_weeks')]
+
+  # study_id_anc1,
+  final = data.frame(study_id_enroll, wks_from_anc1_to_del,
+                     wks_from_anc1_to_us,
+                     wks_from_lmp_to_us, wks_from_lmp_to_del,
+                     wks_from_us_to_del,
+                     lmp, date_anc1, us_date, date_del, 
+                     ga_at_anc1_by_lmp, ga_anc1_by_edd, ga_anc1_recorded,
+                     ga_at_us, fun_ht_anc1,
+                     edd, edd_by_us_date, us_edd, ga_del_by_us_date,
+                     ga_at_deliv_lmp, ga_at_delivery_by_ga_anc1, 
+                     ga_at_delivery_by_edd_anc1,
+                     ga_at_delivery_by_fh_anc1, ga_del_us, ga_weeks_recorded)
+  
+  
+    frame = data.frame(m_age_enroll, m_age_anc1, m_stature, m_wt, parity, grav, fuel, 
+                       enough_food, ever_no_food,
+                     run_out_food, not_enough_food, smoke, hh_smoker, alc,
+                     sex, weight, head_cir, length_b, apgar1, apgar5)
+    frame = data.frame(final, frame)
+    frame
+}
 
 @
 
-<<echo=TRUE>>=
+<<load_data, echo=TRUE>>=
 ## marginal probability of weeks
-df = read.csv(here('data', 'FINALcohort_13Aug2019.csv'))
-table(df$dhc)
+df = read.csv(here('data', 'FinalAnalysisV4ConsentedLabelledRecodedOutliers28July2019.csv'))
+#df = read.csv(here('data', 'FINALCohort_13Aug2019.csv'))
+names(df)
+
+df[df == "#NULL!" | df == " " | df == ""] <- NA
 id_arm = read.csv(here('data', 'RW_Study_ID.csv'))
-table(df$baby_status_28day)
+@
 
-df = df %>% filter((consented == "yes" | consented  == "Yes"))
-table(df$consented, df$country)
-table(df$country)
-##make 
-#df = df %>% filter(eligible_for_followup == "Eligible for Follow-up")
-table(df$eligible_for_followup, df$country)
-table(df$eligibility_for_ptbi, df$country)
-df = df %>% filter(eligibility_for_ptbi == "Eligible")
-df = df %>% filter(facility != " " & facility != "Iganga_Hospital" &
-facility != "Migori_County_Referral_Hospital" & 
-facility != "Jinja_Regional_Ref_Hospital")
-length(unique(df$facility))
-table(df$facility_birth)
-table(df$eligible_for_followup)
-table(df$eligible_for_followupAR)
-table(df$eligibility_for_ptbi)
-table(df$eligibility_for_ptbiAR)
-table(df$country)
+<<inclusion_criteria, echo = F>>=
+##valid enroll date
+#enrl_dt = fix_date(df$enroll_date)
+enrl_dt = as.Date(df$enroll_date, format= "%d-%b-%y")
+head(enrl_dt)
+head(df$enroll_date)
+valid_enroll = enrl_dt >= "2017-05-22" & enrl_dt <= "2019-05-31"
+df = df[valid_enroll == T, ]
+# table(valid_enroll)
+# table(df$dhc)
+@
 
-#df = df %>% filter(baby_status_28day != "Lost_to_followup")
-df = df %>% filter(date_of_delivery != " ")
+<<how_many_anc, echo = F>>=
+dates = subset(df, select = c(anc1date_anc, date_ancfuvst_2,
+                              date_ancfuvst_2b, date_ancfuvst_2c, date_ancfuvst_2d))
+# ## eligible dates ##
+# dates_fix = lapply(1:ncol(dates), function(x) fix_date(dates[,x]))
+# valid_dates = sapply(dates_fix, function(x) x >= "2017-05-22" & x <= "2019-05-31")
+# num_visits = rowSums(valid_dates, na.rm = T)
+# head(dates_fix[[1]])
+# head(dates)
+# head(valid_dates)
+# lapply(valid_dates,table)
+# 
+# ## eligible dates
+# 
+## del_by_us: gestation by us
+##ptb calc
+number_missing = is.na(dates)
+# head(num_missing)
+# head(number_missing)
+# head(dates)
+number_missing_dates = rowSums(number_missing)
+df$number_anc = 5 - number_missing_dates
+table(number_anc)
+# table(df$NumberANCs)
+
+completion = subset(df, select = c(anc_register_initial_visit_complete, anc_register_followup_visits_complete_2,
+    anc_register_followup_visits_complete_2b, anc_register_followup_visits_complete_2c, anc_register_followup_visits_complete_2d))
+
+#lapply(1:ncol(completion), function(x) table(completion[,x]))
+complete = completion != 2 | is.na(completion)
+#head(completion)
+#head(complete)
+num_incomplete = rowSums(complete)
+#head(num_incomplete)
+#head(completion)
+num_anc = 6 - num_incomplete
+
+##identifying those who gave birth by data item; creating dataset of those 
+## nancy's output only included those who had anc1 < 24wks
+## and had at least 2 anc visits
+##delivery data avail
 
 
-table(df$baby_status_28day)
-df$y <- ifelse(df$baby_status_28day == "Dead" | df$baby_status_28day == "PreDischargeDeath", 1, 0)
-table(df$baby_status_28day)
-#nmr
-table(df$baby_discharge_status)
-#fsb
-table(df$birth_outcome)
-df$A = ifelse(df$facility %in% intervention, 1, 0)
-table(df$facility, df$A)
+##nancy has done 24 weeks in her code
+df$anc1ga_anc = as.numeric(as.character(df$anc1ga_anc))
+df_16 = df %>% filter(anc1ga_anc <= 16 & number_anc >= 2)
+df_24 = df %>% filter(anc1ga_anc <= 24 & number_anc >= 2)
+#df_16 = df %>% filter(anc1ga_anc <= 16 & number_anc >= 2)
+
+#ignore ptb rate
+
+## check ganc var for fuvst
+table(df_24$eligible)
+
 
 @
 
-<<load_cross, echo = F>>=
+<<inclusion_criteria>>=
+A1 = c(333, 436, 544, 120, 110, 545, 111, 224, 221)
+A2 = c(435, 331, 541, 115, 113, 539, 226, 329, 332)
 
-df$pair_correct = rep(NA, nrow(df))
+A3 = c(330, 438, 540, 117, 116, 542, 112, 328, 223)
+A4 = c(437, 327, 543, 114, 119, 334, 118, 222, 225)
 
-df$pair_correct[df$facility %in% c("Rongo_Sub-County_Hospital", "Kehancha_Sub-County_Hospital")] <- 1
-df$pair_correct[df$facility %in% c("Kegonga_Sub-County_Hospital", "Uriri_Health_Center")] <- 2
-df$pair_correct[df$facility %in% c("Tisinye_Health_Center", "Karungu_Sub-County_Hospital")] <- 3
-df$pair_correct[df$facility %in% c("Macalder_Sub-County_Hospital", "Isebania_Sub-County_Hospital")] <- 4
-df$pair_correct[df$facility %in% c("Awendo_Sub-County_Hospital", "Ntimaru_Sub-County_Hospital")] <- 5
 
-df$pair_correct[df$facility %in% c("Bugumbe_Health_Center", "Muhuru_Health_Center")] <- 6
-df$pair_correct[df$facility %in% c("Nyamaraga_Sub-County_Hospital", "Othoro_Sub-County_Hospital")] <- 7
-df$pair_correct[df$facility %in% c("St_Camillus_Mission_Hospital", "St_Joseph-Ombo_Mission_Hospital")] <- 8
-df$pair_correct[df$facility %in% c("Kamuli_Hospital", "Bugiri_Hospital")] <- 9
-df$pair_correct[df$facility %in% c("Buluba_Hospital", "Kamuli_Mission_Hospital")] <- 10
 
-#summary(df$pair_correct)
+@
+
+
+
+<<ULTRASOUND, echo = F>>=
+get_ga_us= function(df){
+  df$ga_weeks = as.numeric(as.character(df$ga_weeks))
+  arm1 = df %>% filter(dhc %in% A1)
+  arm2 = df %>% filter(dhc %in% A2)
+  arm3 = df %>% filter(dhc %in% A3)
+  arm4 = df %>% filter(dhc %in% A4)
+
+  us_2 = get_us(arm2, 2)
+  us_4 = get_us(arm4, 4)
+
+ 
+  ##by us_edd
+  summary(as.numeric(us_2$ga_del_us))
+  summary(as.numeric(us_4$ga_del_us))
+  sum(as.numeric(us_2$ga_del_us) < 2, na.rm = T)
+  sum(as.numeric(us_4$ga_del_us) < 2, na.rm = T)
+  
+  ## by us_date and ga at US
+  summary(as.numeric(us_2$ga_del_by_us_date))
+  summary(as.numeric(us_4$ga_del_by_us_date))
+  sum(as.numeric(us_2$ga_del_by_us_date) < 2, na.rm = T)
+  sum(as.numeric(us_4$ga_del_by_us_date) < 2, na.rm = T)
+  sum(as.numeric(us_2$ga_del_by_us_date) > 45, na.rm = T)
+  sum(as.numeric(us_4$ga_del_by_us_date) > 45, na.rm = T)
+
+  
+  df2_edd = us_2 %>% filter(ga_del_us >= 10 & ga_del_us <= 44)
+  df4_edd = us_4 %>% filter(ga_del_us >= 10 & ga_del_us <= 44)
+  
+  dim(df2_edd)
+  dim(df4_edd)
+  sum(!is.na(df2_edd$ga_del_by_us_date))
+  sum(!is.na(df2_edd$ga_del_us))
+  sum(!is.na(df4_edd$ga_del_by_us_date))
+  sum(!is.na(df4_edd$ga_del_us))
+  
+  ##this provides bigger gap for using ga_del_by_us_date
+  df2_usd = us_2 %>% filter(ga_del_by_us_date >= 10 & ga_del_by_us_date <= 43)
+  df4_usd = us_4 %>% filter(ga_del_by_us_date >= 10 & ga_del_by_us_date <= 43)
+  
+  dim(df2_usd)
+  dim(df4_usd)
+  sum(!is.na(df2_usd$ga_del_by_us_date))
+  sum(!is.na(df2_usd$ga_del_us))
+  sum(!is.na(df4_usd$ga_del_by_us_date))
+  sum(!is.na(df4_usd$ga_del_us))
+  
+  get_n = function(j) {
+    j = as.numeric(j)
+    mu = mean(j, na.rm = T)
+    med = median(j, na.rm = T)
+    n = sum(!is.na(j))
+    out = sprintf("mean = %s (n = %s)", round(mu, 3), n)
+    return(out)
+  }
+
+  #df2 = us_2 %>% filter(ga_del_by_us_date >= 24 & ga_del_by_us_date <= 43)
+  #df4 = us_4 %>% filter(ga_del_by_us_date >= 24 & ga_del_by_us_date <= 43)
+  
+  ## this is for us date variable (not edd date)
+  ptb2 = df2_usd[df2_usd$ga_del_by_us_date < 37, ]
+  ptb4 = df4_usd[df4_usd$ga_del_by_us_date < 37, ]
+  summary(as.numeric(ptb2$ga_del_by_us_date))
+  summary(as.numeric(ptb4$ga_del_by_us_date))
+  sum(is.na(ptb2$ga_del_by_us_date))
+
+    
+  #df$birth_weight < 2500 | df$birth_weight >= 2500 & df$birth_weight <= 2999 & df$ga < 37 |
+  #                 df$birth_outcome == "Fresh_Still_Birth" & df$ga < 37, "elig_for_ptb", "not_elig_for_ptb"
+  
+
+  defn_ptb2 = df2_usd$ga_weeks_recorded < 37 & df2_usd$weight >=2500 & df2_usd$weight <=2999 | df2_usd$weight < 2500
+  defn_ptb4 = df4_usd$ga_weeks_recorded < 37 & df4_usd$weight >=2500 & df4_usd$weight <=2999 | df4_usd$weight < 2500
+  # sum(defn_ptb2, na.rm = T)
+  # sum(defn_ptb4, na.rm = T)
+  # sum(df2_usd$ga_weeks_recorded < 37, na.rm = T) /sum(!is.na(df2_usd$ga_weeks_recorded))
+  # sum(df4_usd$ga_weeks_recorded < 37, na.rm = T)
+  ga_rec_usd = c(get_n(df2_usd$ga_weeks_recorded), get_n(df4_usd$ga_weeks_recorded))
+  ptb_rec_usd = c(get_n(defn_ptb2), get_n(defn_ptb4))
+
+  ptb_usd2 = as.numeric(df2_usd$ga_del_by_us_date) < 37
+  ptb_usd4 = as.numeric(df4_usd$ga_del_by_us_date) < 37
+  ptb_usd = c(get_n(ptb_usd2), get_n(ptb_usd4))
+  ga_usd = c(get_n(df2_usd$ga_del_by_us_date), get_n(df4_usd$ga_del_by_us_date))
+  
+  
+  ptb_usd_edd2 = as.numeric(df2_usd$ga_del_us) < 37
+  ptb_usd_edd4 = as.numeric(df4_usd$ga_del_us) < 37
+  ptb_usd_edd = c(get_n(ptb_usd_edd2), get_n(ptb_usd_edd4))
+  ga_usd_edd = c(get_n(df2_usd$ga_del_by_us_date), get_n(df4_usd$ga_del_by_us_date))
+  
+  
+  ## edd variable
+  ga_rec_edd = c(get_n(df2_edd$ga_weeks_recorded), get_n(df4_edd$ga_weeks_recorded))
+  ptb_rec_edd = c(get_n(df2_edd$ga_weeks_recorded < 37), get_n(df4_edd$ga_weeks_recorded < 37))
+
+  
+  ptb_edd2 = as.numeric(df2_edd$ga_del_us) < 37
+  ptb_edd4 = as.numeric(df4_edd$ga_del_us) < 37
+  ptb_edd = c(get_n(ptb_edd2), get_n(ptb_edd4))
+  ga_edd = c(get_n(df2_edd$ga_del_us), get_n(df4_edd$ga_del_us))
+  
+  
+  ptb_edd_usd2 = as.numeric(df2_edd$ga_del_by_us_date) < 37
+  ptb_edd_usd4 = as.numeric(df4_edd$ga_del_by_us_date) < 37
+  ptb_edd_usd = c(get_n(ptb_edd_usd2), get_n(ptb_edd_usd4))
+  ga_edd_usd = c(get_n(df2_edd$ga_del_by_us_date), get_n(df4_edd$ga_del_by_us_date))
+  
+
+  all_ptb2 = us_2$ga_weeks_recorded < 37 & us_2$weight >=2500 & us_2$weight <=2999 | us_2$weight < 2500
+  all_ptb4 = us_4$ga_weeks_recorded < 37 & us_4$weight >=2500 & us_4$weight <=2999 | us_4$weight < 2500
+  #ptb_all2 = as.numeric(as.character(us_2$ga_weeks_recorded)) < 37
+  #ptb_all4 = as.numeric(as.character(us_4$ga_weeks_recorded)) < 37
+  ptb_all = c(get_n(all_ptb2), get_n(all_ptb4))
+
+  ga_all2 = get_n(as.numeric(as.character(us_2$ga_weeks_recorded)))
+  ga_all4 = get_n(as.numeric(as.character(us_4$ga_weeks_recorded)))
+  ga_all = c(ga_all2, ga_all4)
+  
+  # sum(is.na(df2_ptb))
+  # ptb_usd_edd, ptb_edd, ptb_edd_usd,
+  #ga_usd_edd, ga_edd, ga_edd_usd,
+  # ptb_rec_usd, ptb_rec_edd,
+  # ga_rec_usd, ga_rec_edd,
+  out_ptb = (data.frame(rbind(ptb_usd, ptb_all)))
+  out_ga = data.frame(rbind(ga_usd, ga_all))
+  names(out_ptb) = c("std. anc", "grp anc")
+  names(out_ga) = c("std. anc", "grp_anc")
+  out_ptb
+  out_ga
+  return(out)
+
+
+
+  summary(as.numeric(df2$ga_del_us), na.rm = T)
+  summary(as.numeric(df4$ga_del_us), na.rm = T)
+
+  summary(as.numeric(df2$ga_del_by_us_date),na.rm = T)
+  summary(as.numeric(df4$ga_del_by_us_date),na.rm = T)
+
+  summary(as.numeric(df2$ga_at_delivery_by_ga_anc1), na.rm = T)
+  summary(as.numeric(df4$ga_at_delivery_by_ga_anc1), na.rm = T)
+
+  summary(as.numeric(df2$ga_weeks_recorded), na.rm = T)
+  summary(as.numeric(df4$ga_weeks_recorded), na.rm = T)
+  
+}
+
+#get_ga_us(df_16)
+#et_ga_us(df_24)
 @
 
 
