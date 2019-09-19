@@ -95,6 +95,12 @@ return(ancdate_missing)
 
 get_us = function(x, arm) {
   study_id_enroll = x[, sprintf('study_id_full_new')]
+  # table(arm2$SID)
+  # mean(is.na(arm2$study_id_full_new))
+  # dim(arm4)
+  # table(df$SIDcorrect)
+  
+  #study_id_enroll = x[, sprintf('study_id_enroll')]
   #study_id_anc1 = x[, sprintf('study_id_anc')]
   m_age_enroll = as.numeric(as.character(x[ ,'m_age']))
   m_age_anc1 = as.numeric(x[ ,'m_age_anc'])
@@ -105,13 +111,17 @@ get_us = function(x, arm) {
   
   #date_del = fix_date(x[, 'date_delivery_mat'])
   date_del = as.Date(x[, 'date_delivery_mat'], format= "%d-%b-%y")
+  date_del = as.Date(x[, 'date_delivery_mat'], format= "%m/%d/%Y")
+
 
   date_anc1 = as.Date(x[, 'anc1date_anc'], format= "%d-%b-%y")
+  date_anc1 = as.Date(x[, 'anc1date_anc'], format = "%m/%d/%Y")
+  
   days_from_anc1_to_del = (date_del - date_anc1)
   wks_from_anc1_to_del = (date_del - date_anc1)/7
   
   ## LMP ##
-  lmp = as.Date(x[, sprintf('lmp_anc')], format= "%d-%b-%y")
+  lmp = as.Date(x[, sprintf('lmp_anc')], format= "%m/%d/%Y")
   
   wks_from_lmp_to_del = (date_del - lmp) / 7
   
@@ -120,6 +130,7 @@ get_us = function(x, arm) {
   ga_at_deliv_lmp = (ga_at_anc1_by_lmp) + (days_from_anc1_to_del / 7)
   ## LMP ##
   edd = as.Date(x[, sprintf('edd_anc')], format= "%d-%b-%y")
+  edd = as.Date(x[, sprintf('edd_anc')], format= "%m/%d/%Y")
 
   ga_at_delivery_by_edd_anc1 = (280 + (date_del - edd)) / 7
   
@@ -165,10 +176,11 @@ get_us = function(x, arm) {
    if (arm == 2 | arm == 4) {
     #us_edd = date_cleaning(as.Date(x[, sprintf('edd_us')], format = "%Y-%m-%d"))
     us_edd = as.Date(x[, sprintf('edd_us')], format= "%d-%b-%y")
+    us_edd = as.Date(x[, sprintf('edd_us')], format= "%m/%d/%Y")
     
     ga_at_us = as.numeric(as.character(x[, sprintf('us_adjga')]))
 
-    us_date =  as.Date(x[, sprintf('us_date')],format= "%d-%b-%y")
+    us_date =  as.Date(x[, sprintf('us_date')],format= "%m/%d/%Y")
     #us_date[140:145]
     #x[140:145, 'us_date']
     
@@ -225,7 +237,13 @@ get_us = function(x, arm) {
 
 <<load_data, echo=TRUE>>=
 ## marginal probability of weeks
-df = read.csv(here('data', 'FinalAnalysisV4ConsentedLabelledRecodedOutliers28July2019.csv'))
+#df = read.csv(here('data', 'FinalAnalysisV4ConsentedLabelledRecodedOutliers28July2019.csv'))
+
+#df = read.csv(here('data', 'FinalAnalysisV4ConsentedLabelledRecodedOutliers28July2019.csv'))
+#df = read.csv(here('data', 'FinalPTBiCohort_15Sept19.csv'))
+
+df = read.csv(here('data', 'ARMS1_2__3Corrected_4FinalAnalysisV4ConsentedLabelledRecodedOutliersMATERNALFACILITY16Sep2019.csv'))
+
 #df = read.csv(here('data', 'FINALCohort_13Aug2019.csv'))
 names(df)
 
@@ -236,7 +254,8 @@ id_arm = read.csv(here('data', 'RW_Study_ID.csv'))
 <<inclusion_criteria, echo = F>>=
 ##valid enroll date
 #enrl_dt = fix_date(df$enroll_date)
-enrl_dt = as.Date(df$enroll_date, format= "%d-%b-%y")
+enrl_dt = as.Date(df$enroll_date, format= "%d %b %y")
+enrl_dt = as.Date(df$enroll_date, format= "%m/%d/%Y")
 head(enrl_dt)
 head(df$enroll_date)
 valid_enroll = enrl_dt >= "2017-05-22" & enrl_dt <= "2019-05-31"
@@ -267,7 +286,7 @@ number_missing = is.na(dates)
 # head(dates)
 number_missing_dates = rowSums(number_missing)
 df$number_anc = 5 - number_missing_dates
-table(number_anc)
+table(df$number_anc)
 # table(df$NumberANCs)
 
 completion = subset(df, select = c(anc_register_initial_visit_complete, anc_register_followup_visits_complete_2,
@@ -290,7 +309,7 @@ num_anc = 6 - num_incomplete
 
 ##nancy has done 24 weeks in her code
 df$anc1ga_anc = as.numeric(as.character(df$anc1ga_anc))
-df_16 = df %>% filter(anc1ga_anc <= 16 & number_anc >= 2)
+#df_16 = df %>% filter(anc1ga_anc <= 16 & number_anc >= 2)
 df_24 = df %>% filter(anc1ga_anc <= 24 & number_anc >= 2)
 #df_16 = df %>% filter(anc1ga_anc <= 16 & number_anc >= 2)
 
@@ -310,9 +329,7 @@ A3 = c(330, 438, 540, 117, 116, 542, 112, 328, 223)
 A4 = c(437, 327, 543, 114, 119, 334, 118, 222, 225)
 
 
-
 @
-
 
 
 <<ULTRASOUND, echo = F>>=
