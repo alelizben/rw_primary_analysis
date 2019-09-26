@@ -307,22 +307,22 @@ get_consort = function(df, ga_type) {
   valid_ga_lmp_del = table(elig_enroll$valid_ga_lmp, useNA = "always")
   
   elig = (elig_enroll$anc1ga_anc <= 24 & elig_enroll$number_anc >= 2 & 
-            elig_enroll$date_del<= "2019-04-16" & 
+            elig_enroll$date_del<= "2019-03-31" & 
             (elig_enroll$valid_ga_recorded == T | elig_enroll$valid_ga_lmp == T))
   elig_mother_baby_pair = table(elig, useNA = 'always')
   elig_mother_baby_pair
   
-  delivered_before_april_19 = table(elig_enroll$date_del <= "2019-04-16", useNA = "always")
-  delivered_before_april_19
+  delivered_before_march_31 = table(elig_enroll$date_del <= "2019-03-31", useNA = "always")
+  delivered_before_march_31
 
     
   ltfu = (elig_enroll$anc1ga_anc <= 24 & elig_enroll$number_anc >= 2 & 
-            elig_enroll$date_del<= "2019-04-16") & 
+            elig_enroll$date_del<= "2019-03-31") & 
             (elig_enroll$valid_ga_recorded != T | elig_enroll$valid_ga_lmp != T)
   is_ltfu = table(ltfu, useNA = 'always')
   #df_16 = df %>% filter(anc1ga_anc <= 16 & number_anc >= 2)
   
-  out_elig_outcome = data.frame(rbind(valid_recorded_ga_del, valid_ga_lmp_del, elig_mother_baby_pair, delivered_before_april_19, is_ltfu))
+  out_elig_outcome = data.frame(rbind(valid_recorded_ga_del, valid_ga_lmp_del, elig_mother_baby_pair, delivered_before_march_31, is_ltfu))
   out_elig_outcome$total = rowSums(out_elig_outcome)
   out_elig_outcome
   
