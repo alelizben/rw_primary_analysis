@@ -260,33 +260,56 @@ id_arm = read.csv(here('data', 'RW_Study_ID.csv'))
 ##split into arms
 @
 
+
+<<inclusion_criteria>>=
+A1 = c(333, 436, 544, 120, 110, 545, 111, 224, 221)
+A2 = c(435, 331, 541, 115, 113, 539, 226, 329, 332)
+
+A3 = c(330, 438, 540, 117, 116, 542, 112, 328, 223)
+A4 = c(437, 327, 543, 114, 119, 334, 118, 222, 225)
+
+  arm1 = df %>% filter(dhc %in% A1)
+  arm2 = df %>% filter(dhc %in% A2)
+  arm3 = df %>% filter(dhc %in% A3)
+  arm4 = df %>% filter(dhc %in% A4)
+  
+  arm1 = df %>% filter(dhc %in% A1  | dhc %in% A2)
+  #arm2 = df %>% filter(dhc %in% A2 | dhc %in% A1)
+  arm2 = df %>% filter(dhc %in% A3 | dhc %in% A4)
+  #arm4 = df %>% filter(dhc %in% A4)
+
+@
+
+
+
+
 <<function_for_consort, echo = F>>=
 get_consort = function(df, ga_type) {
-  
+    #eligible_enroll_date
+  #anc1_date = as.Date(df$anc1date_anc, format = "%m/%d/%Y")
+  enroll_date = as.Date(df$enroll_date, format = "%m/%d/%Y")
+  valid_enroll = enroll_date >=  "2017-05-22" & enroll_date <= "2018-10-31"
+  df$valid_enroll = valid_enroll == T
+  elig_enroll_date = table(df$valid_enroll, useNA = 'always')
+
   ##departed after without clinic visit
-  df$enroll_but_no_anc1 = !(!is.na(df$enroll_date) & is.na(df$anc1date_anc))
-  stayed_for_clinic = table(df$enroll_but_no_anc1, useNA = "always")
-  (stayed_for_clinic)
-  #anc1_ga_lt_24_weeks
-  df$anc1ga_anc = as.numeric(as.character(df$anc1ga_anc))
-  df$anc_ga_lt_24_wks = df$anc1ga_anc <= 24
-  anc1_ga_lt_24 = table(df$anc_ga_lt_24_wks, useNA = 'always')
-
-  #eligible_enroll_date
-  anc1_date = as.Date(df$anc1date_anc, format = "%m/%d/%Y")
-  valid_anc1 = anc1_date >=  "2017-05-22" & anc1_date <= "2018-10-31"
-  df$valid_anc1 = valid_anc1 == T
-  elig_enroll_date = table(df$valid_anc1, useNA = 'always')
-    
-  anc1_ga_lt_24_valid_enroll_date = table((df$valid_anc1 == T & !is.na(df$anc_ga_lt_24_wks) &
-                                            df$anc_ga_lt_24_wks == T), useNA = "always")
+  df = df %>% filter(valid_enroll == T)
+  df$enroll_but_no_anc1 = (!is.na(df$enroll_date) & is.na(df$anc1date_anc))
+  departed_without_clinic = table(df$enroll_but_no_anc1, useNA = "always")
+  (departed_without_clinic)
   
-  out_elig_enroll = data.frame(rbind(stayed_for_clinic, anc1_ga_lt_24, elig_enroll_date, anc1_ga_lt_24_valid_enroll_date))
-  out_elig_enroll$total = rowSums(out_elig_enroll)
-
+  ###anc1_ga_lt_24_weeks
+  df$anc1ga_anc = as.numeric(as.character(df$anc1ga_anc))
+  df$anc_ga_lt_24_wks = df$anc1ga_anc <= 24 & (df$enroll_but_no_anc1 == F)
+  anc1_ga_lt_24 = table(df$anc_ga_lt_24_wks, useNA = 'always')
+  anc1_ga_lt_24
+  #anc1_ga_lt_24_valid_enroll_date = table((df$valid_anc1 == T & !is.na(df$anc_ga_lt_24_wks) &
+   #                                         df$anc_ga_lt_24_wks == T), useNA = "always")
+  
+  out_elig_enroll = data.frame(rbind(elig_enroll_date, departed_without_clinic, anc1_ga_lt_24))
 
   ## subset ##
-  elig_enroll = df %>% filter(!is.na(valid_anc1) & valid_anc1 == T & !is.na(anc_ga_lt_24_wks) & anc_ga_lt_24_wks == T)
+  elig_enroll = df %>% filter(anc_ga_lt_24_wks)
   ## subset ##
   
   ## MOTHER BABY PAIRS ##
@@ -302,31 +325,36 @@ get_consort = function(df, ga_type) {
   
   elig_enroll$valid_ga_recorded = elig_enroll$ga_weeks >= 20 & elig_enroll$ga_weeks <= 44
   elig_enroll$valid_ga_lmp = elig_enroll$ga_at_del_by_lmp >= 20 & elig_enroll$ga_at_del_by_lmp <= 44
+  ##all should be valid recorded GA
   valid_recorded_ga_del = c(table(elig_enroll$valid_ga_recorded, useNA = "always"), 0)[c(3,1,2)]
   names(valid_recorded_ga_del)[1] = FALSE
   valid_ga_lmp_del = table(elig_enroll$valid_ga_lmp, useNA = "always")
   
-  elig = (elig_enroll$anc1ga_anc <= 24 & elig_enroll$number_anc >= 2 & 
-            elig_enroll$date_del<= "2019-03-31" & 
-            (elig_enroll$valid_ga_recorded == T | elig_enroll$valid_ga_lmp == T))
-  elig_mother_baby_pair = table(elig, useNA = 'always')
-  elig_mother_baby_pair
-  
   delivered_before_march_31 = table(elig_enroll$date_del <= "2019-03-31", useNA = "always")
-  delivered_before_march_31
 
-    
-  ltfu = (elig_enroll$anc1ga_anc <= 24 & elig_enroll$number_anc >= 2 & 
-            elig_enroll$date_del<= "2019-03-31") & 
-            (elig_enroll$valid_ga_recorded != T | elig_enroll$valid_ga_lmp != T)
-  is_ltfu = table(ltfu, useNA = 'always')
+  elig_enroll = elig_enroll %>% filter(date_del <= "2019-03-31") 
+  elig = (elig_enroll$anc1ga_anc <= 24 & elig_enroll$number_anc >= 2)
+  
+  anc_lt_24_and_2_anc_visits = table(elig, useNA = 'always')
+  
+  elig_mother_baby = elig_enroll %>% filter(elig == T) 
+  
+  ### NA COME FROM MOSTLY GA RECORDED
+  ltfu = ((elig_mother_baby$valid_ga_recorded == T | elig_mother_baby$valid_ga_lmp == T))
+  attained_outcome = c(table(ltfu, useNA = 'always'), 0)[c(3, 1, 2)]
+  attained_outcome
+  names(attained_outcome)[1] = "FALSE"
+
   #df_16 = df %>% filter(anc1ga_anc <= 16 & number_anc >= 2)
   
-  out_elig_outcome = data.frame(rbind(valid_recorded_ga_del, valid_ga_lmp_del, elig_mother_baby_pair, delivered_before_march_31, is_ltfu))
-  out_elig_outcome$total = rowSums(out_elig_outcome)
-  out_elig_outcome
-  
-  out = rbind(out_elig_enroll, out_elig_outcome)
+  #valid_recorded_ga_del, valid_ga_lmp_del, 
+  out_elig_mother_baby = data.frame(rbind(delivered_before_march_31, 
+                                      anc_lt_24_and_2_anc_visits,
+                                      attained_outcome))
+
+  #out_elig_enroll, 
+  out = rbind(out_elig_enroll, out_elig_mother_baby)
+  out$total = rowSums(out)
 
   out
 
@@ -334,30 +362,22 @@ get_consort = function(df, ga_type) {
 }
 @
 
-<<inclusion_criteria>>=
-A1 = c(333, 436, 544, 120, 110, 545, 111, 224, 221)
-A2 = c(435, 331, 541, 115, 113, 539, 226, 329, 332)
-
-A3 = c(330, 438, 540, 117, 116, 542, 112, 328, 223)
-A4 = c(437, 327, 543, 114, 119, 334, 118, 222, 225)
-
-  arm1 = df %>% filter(dhc %in% A1)
-  arm2 = df %>% filter(dhc %in% A2)
-  arm3 = df %>% filter(dhc %in% A3)
-  arm4 = df %>% filter(dhc %in% A4)
-
-@
 
 <<make_consort, echo = F>>=
   a1 = get_consort(arm1)
   a2 = get_consort(arm2)
+  
+  
   a3 = get_consort(arm3)
   a4 = get_consort(arm4)
   library(openxlsx)
   write_out = list(a1, a2, a3, a4)
   names(write_out) = c("arm1", "arm2", "arm3", "arm4")
+  write_out = list(a1, a2)
+  names(write_out) = c("sANC", "gANC")
+
   ?write.csv
-  openxlsx::write.xlsx(write_out, file = here('consort_by_arm.xlsx'), row.names = T)
+  openxlsx::write.xlsx(write_out, file = here('consort_by_group.xlsx'), row.names = T)
 @
 <<consented, echo = F>>=
 table(df$Consentgranted)
