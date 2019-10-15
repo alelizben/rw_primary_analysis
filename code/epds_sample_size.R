@@ -6,41 +6,35 @@ library(gridExtra)
 #setwd('~/Documents/ptbi/power calc/')
 dat = read.csv(here("data", "epds_Data.csv"))
 ctrl_n = dat$Number.of.Observations.Postpartum[dat$Arm == "Control" | dat$Arm == "Control "]
+ctrl_n = ctrl_n[ctrl_n > 11]
 length(ctrl_n)
 
-ctrl_n = ctrl_n[ctrl_n > 11]
+
 interv_n = dat$Number.of.Observations.Postpartum[dat$Arm == "Group" | dat$Arm == "Group "]
 interv_n = interv_n[interv_n > 11]
 length(interv_n)
+all = c(ctrl_n, interv_n)
+all = all[all < 130 & all > 16]
+all
+
 current.rates = c(ctrl_n, interv_n)
 
-ctrl_rt = dat$Postpartum.Depression.Prevalence[(dat$Arm == "Control" | dat$Arm == "Control ") & 
-                                                 dat$Number.of.Observations.Postpartum > 11]
-mean(ctrl_rt)
-interv_rt = dat$Postpartum.Depression.Prevalence[(dat$Arm == "Group" | dat$Arm == "Group ") & 
-                                                   dat$Number.of.Observations.Postpartum > 11]
-mean(interv_rt)
-
-ctrl_bl_rt = dat$Baseline.Depression.Prevalence[(dat$Arm == "Control" | dat$Arm == "Control ") & 
-                                                 dat$Number.of.Observations.Postpartum > 11]
-mean(ctrl_bl_rt)
-interv_bl_rt = dat$Baseline.Depression.Prevalence[(dat$Arm == "Group" | dat$Arm == "Group ") & 
-                                                   dat$Number.of.Observations.Postpartum > 11]
-mean(interv_bl_rt)
+## more depressed; selection  bias; depressed women
+## sentence that goes with confidence interval 
 
 ## matched for proportion M_Hayes using harmonic mean (7.14)
 
 
 ##unmatched M_H 7.11
-power.var.cl.size = function(p0, p1, m.H, rho){
-  t = pnorm( sqrt( (28-1) * (m.H * (p0 - p1) ^ 2) / ((p0 * (1 - p0) + p1 * (1 - p1)) * (1 + (m.H - 1) * rho)) ) - qnorm(.975))
+power.var.cl.size = function(p0, p1, m.H, rho, nclust){
+  t = pnorm( sqrt( (nclust-1) * (m.H * (p0 - p1) ^ 2) / ((p0 * (1 - p0) + p1 * (1 - p1)) * (1 + (m.H - 1) * rho)) ) - qnorm(.975))
   
   return(t)
 }
 
 get_km = function(km_range, pct, p0) {
   #rates to inrease volume  by
-  rates = c(0, 0.6, 1, 1.4, 1.8)
+  rates = c(0, 3, 5, 7)
   power = matrix(NA, length(rates), length(km_range))
   volume = rep(NA, length(rates))
   
@@ -60,8 +54,9 @@ get_km = function(km_range, pct, p0) {
    
           vect = ss
       
-         ctrl = round(mean(ss[1:14]))
-         interv = round(mean(ss[15:28]))
+         #ctrl = round(mean(ss[1:14]))
+         ctrl = round(mean(ss[1:(length(ss)/2)]))
+         interv = round(mean(ss[(length(ss)/2 + 1):length(ss)]))
          rate = sprintf("avg ctrl %s, avg interv %s", ctrl, interv)
         
 
@@ -78,7 +73,7 @@ get_km = function(km_range, pct, p0) {
       p1  = p0 * (1 - pct.rd)
       m.H = 1 / mean(1 / ss[[1]])
 
-      power[i, k] = power.var.cl.size(p0, p1, m.H, rho)
+      power[i, k] = power.var.cl.size(p0, p1, m.H, rho, length(ss[[1]]))
       volume[i] = ss[[2]]
       
       ## rate increase, add months, km
@@ -103,7 +98,10 @@ get_km = function(km_range, pct, p0) {
   
 } 
 
-plot_power = function(x1, pct_red, p0) {
+km_range = seq(0, 0.3, 0.06)
+
+
+plot_power = function(x1, pct_red, p0, nclust) {
   
   #row_names = paste(seq(0, 50, 10), "%_volume_incr", sep = "")
   row_names1 = row.names(x1)
@@ -126,7 +124,7 @@ plot_power = function(x1, pct_red, p0) {
     #labs(title = sprintf("effect size = %s%%, %s mos, Uganda ends early", pct_red*100, mos)) + 
     labs(title = sprintf("effect size = %s%%, Rwanda", pct_red * 100)) + 
     scale_y_continuous(breaks = seq(0.0, 1, 0.1), limits = c(0, 1)) + 
-    scale_x_continuous( "icc", breaks = seq(0.0, 0.4, 0.1), limits = c(0, 0.4)) + theme(axis.text=element_text(size= 13),
+    scale_x_continuous( "icc", breaks = km_range, limits = c(0, max(km_range))) + theme(axis.text=element_text(size= 13),
                                                                                         legend.position = "bottom", legend.text=element_text(size = 12))
   
   #plot(pl1)
@@ -135,7 +133,7 @@ plot_power = function(x1, pct_red, p0) {
   #mylegend<-g_legend(pl2)
   
   #jpeg(sprintf('power_plot_%s_%s.jpg', pct_red*100, mos), width = 1442, height = 600)
-  jpeg(here("", sprintf('power3_p0%s_effectsize%s_%s.jpg', p0, pct_red*100, Sys.Date())), width = 1442, height = 630)
+  jpeg(here("", sprintf('power_nclust%s_p0%s_effectsize%s_%s.jpg', nclust, p0, pct_red*100, Sys.Date())), width = 900, height = 630)
   
   grid.arrange(pl1)    
   
@@ -164,14 +162,15 @@ g_legend<-function(a.gplot){
   legend <- tmp$grobs[[leg]]
   return(legend)}
 
-km_range = seq(0, 0.4, 0.06)
+n_arm = 15
+current.rates = c(sample(all, n_arm), sample(all, n_arm))
+#current.rates = c(ctrl_n, interv_n)
 
-
-for (p in c(.25, .30, .40, .60)) {
+for (p in c(0.4, 0.5, 0.6)) {
     
-    X1 = get_km(km_range, p, .12)
+    X1 = get_km(km_range, p, .15)
 
-    plot_power(X1, p, 0.12)
+    plot_power(X1, p, 0.15, length(current.rates))
     
 } 
 

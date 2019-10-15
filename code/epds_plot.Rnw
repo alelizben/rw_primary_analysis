@@ -1,0 +1,157 @@
+\documentclass[12pt]{article}
+
+%\usepackage{times}
+\usepackage{hyperref}
+\hypersetup{pdfpagemode=UseNone} % don't show bookmarks on initial view
+\hypersetup{colorlinks, urlcolor={blue}}
+
+% revise margins
+\setlength{\headheight}{0.0in}
+\setlength{\topmargin}{0.0in}
+\setlength{\headsep}{0.0in}
+\setlength{\textheight}{8.65in}
+\setlength{\footskip}{0.35in}
+\setlength{\oddsidemargin}{0.0in}
+\setlength{\evensidemargin}{0.0in}
+\setlength{\textwidth}{6.5in}
+
+\setlength{\parskip}{6pt}
+\setlength{\parindent}{0pt}
+
+\begin{document}
+
+%\sffamily
+{\textbf{EPDS Survey}}
+
+%\href{http://kbroman.org}{Karl W Broman}
+Alejandra Benitez and the Preterm Birth Initiative
+
+%This is a portion of the ``\href{http://www.rqtl.org/rqtltour2.pdf}{A shorter tour of R/qtl}''
+%tutorial, developed here in multiple formats to illustrate the use of knitr.
+%This particular document is written with \href{http://www.latex-project.org}{LaTeX}.
+
+<<knitr_options, include=FALSE>>=
+library(knitr)
+library(here)
+library(dplyr)
+library(geepack)
+library(parsedate)
+opts_chunk$set(fig.width=12, fig.height=4, fig.path='RnwFigs/',
+warning=FALSE, message=FALSE, tidy=FALSE)
+options(width=60)
+set.seed(53079239)
+# install R/qtl package if necessary:
+if(!require("qtl")) install.packages("qtl", repos="http://cran.us.r-project.org")
+@
+
+\bigskip
+%\sffamily 
+\textbf{Abstract}
+\newline
+%\nopagebreak
+
+\textit{Results}
+Our preliminary results 
+
+\textit{Conclusions}
+
+
+\section{Results}
+\begin{itemize}
+\item Table 1 for population, age, SES, region
+\end{itemize}
+%
+%\textbf{Results}
+%
+You then load the R/qtl package using the {\tt library} function:
+
+%<<load_qtl>>=
+%library(qtl)
+%@
+
+
+
+<<echo=FALSE, cache=FALSE>>=
+source(here('code', "rw_consort_functions.R"))
+@
+
+<<load_data, echo=TRUE>>=
+dat = read.csv(here("data", "epds_Data.csv"))
+df = read.csv(here('data', "ParticipantSurveyCohortMerged.csv"))
+
+by_fac = split(df,c(df$study_id_dhc))
+
+sapply(by_fac ,function(x) mean(x$depress13_el_new, na.rm = T))
+sapply(by_fac ,function(x) sum(!is.na(x$depress13_el_new)))
+dat$Arm = as.character(dat$Arm)
+dat$Arm[dat$Arm == "Group "] <- "Group"
+dat$Arm[dat$Arm == "Control "] <- "Control"
+dat$Arm[dat$Arm == "Group"] <- "gANC"
+dat$Arm[dat$Arm == "Control"] <- "stANC"
+
+plot_data = dat %>% filter( (Arm == "gANC" | Arm == "stANC") & Number.of.Observations.Postpartum > 11 )
+
+ctrl_n = dat$Number.of.Observations.Postpartum[dat$Arm == "stANC"]
+ctrl_n = ctrl_n[ctrl_n > 11]
+length(ctrl_n)
+
+
+interv_n = dat$Number.of.Observations.Postpartum[dat$Arm == "gANC"]
+interv_n = interv_n[interv_n > 11]
+length(interv_n)
+current.rates = c(ctrl_n, interv_n)
+
+ctrl_rt = dat$Postpartum.Depression.Prevalence[(dat$Arm == "stANC") & 
+                                                 dat$Number.of.Observations.Postpartum > 11]
+mean(ctrl_rt)
+interv_rt = dat$Postpartum.Depression.Prevalence[(dat$Arm == "gANC") & 
+                                                   dat$Number.of.Observations.Postpartum > 11]
+mean(interv_rt)
+
+###########
+
+ctrl_bl_rt = dat$Baseline.Depression.Prevalence[(dat$Arm == "stANC") & 
+                                                 dat$Number.of.Observations.Postpartum > 11]
+mean(ctrl_bl_rt)
+interv_bl_rt = dat$Baseline.Depression.Prevalence[(dat$Arm == "gANC") & 
+                                                   dat$Number.of.Observations.Postpartum > 11]
+mean(interv_bl_rt)
+
+@
+
+
+<<inclusion_criteria, echo = F, out.width='4in', out.height='4in'>>=
+
+boxplot(ctrl_rt, interv_rt)
+boxplot(ctrl_n, interv_n)
+
+plot_data$depr_rate = plot_data$Postpartum.Depression.Prevalence
+plot_data$N = plot_data$Number.of.Observations.Postpartum
+
+p_rate = ggplot(plot_data, aes(Arm, depr_rate))
+p_rate + geom_boxplot(outlier.shape = NA) + geom_jitter(width = 0.2)
+
+p_Nobs =  ggplot(plot_data, aes(Arm, N))
+p_Nobs + geom_boxplot(outlier.shape = NA) + geom_jitter(width = 0.2)
+
+@
+
+
+
+
+
+\bigskip
+{\sffamily \textbf{R and package versions used}}
+\nopagebreak
+
+
+
+
+<<sessionInfo, include=TRUE, echo=TRUE, results='markup'>>=
+sessionInfo()
+@
+
+% \bibliography{ga_pred} 
+% \bibliographystyle{ieeetr}
+
+\end{document}

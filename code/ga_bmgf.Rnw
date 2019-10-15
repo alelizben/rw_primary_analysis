@@ -36,6 +36,7 @@ library(here)
 library(dplyr)
 library(geepack)
 library(parsedate)
+library(ggplot2)
 opts_chunk$set(fig.width=12, fig.height=4, fig.path='RnwFigs/',
 warning=FALSE, message=FALSE, tidy=FALSE)
 options(width=60)
@@ -89,6 +90,12 @@ id_arm = read.csv(here('data', 'RW_Study_ID.csv'))
 @
 
 
+<<echo=FALSE, cache=FALSE>>=
+source(here('code', "rw_consort_functions.R"))
+source(here('code', "ga_pred", "functions.R"))
+@
+
+
 <<inclusion_criteria>>=
 A1 = c(333, 436, 544, 120, 110, 545, 111, 224, 221)
 A2 = c(435, 331, 541, 115, 113, 539, 226, 329, 332)
@@ -109,20 +116,235 @@ arm4 = df %>% filter(dhc %in% A4)
 
 <<get_valid_women>>=
 
-con2 = get_consort(arm2)
-con4 = get_consort(arm4)
-us_2 = get_us(con2, 2) 
-us_4 = get_us(con4, 4)
-trainb = make_data(con2, con4, "binomial", wk_thresh = 19)
-traing = make_data(con2, con4, "gaussian", wk_thres = 19)
+df2 = get_elig(arm2, "elig_enroll")
+df4 = get_elig(arm4, "elig_enroll")
+
+df1 = get_elig(arm1, "elig_enroll")
+df3 = get_elig(arm3, "elig_enroll")
+us_1 = get_us(df1, 2) 
+us_3 = get_us(df3, 4)
+new_frame = make_data(us_1, us_3, "binomial", wk_thresh = 20, 1)
+# sum(us2$ga_anc1_recorded < 20, na.rm=T) + sum(us4$ga_anc1_recorded < 20, na.rm = T)
+# sum(us2$ga_at_us < 20, na.rm = T) + sum(us4$ga_at_us < 20, na.rm = T)
+
+us_2 = get_us(df2, 2) 
+us_4 = get_us(df4, 4)
+train = make_data(us_2, us_4, "binomial", wk_thresh = 20)
+#traing = make_data(us_2, us_4, "gaussian", wk_thresh = 20)
+train$Arm = ifelse(train$dhc %in% A2, "stANC", "gANC")
+#table(ifelse(trainb$dhc %in% A4, "stANC", "gANC"))
 
 @
 
 
+<<make_plots, echo = F >>=
+# cor_check = subset(plot_data, select = c(ga_weeks_recorded, ga_del_by_us_date))
+# cor_check = cor_check[(complete.cases(cor_check)),]
+# cor(cor_check$ga_weeks_recorded, cor_check$ga_del_by_us_date)
+# p_rate = ggplot(plot_data, aes(Arm, ga_del_by_us_date))
+# 
+# p_rate + geom_boxplot(outlier.shape = NA) + geom_jitter(width = 0.2) 
+
+plot_data = subset(train, select = c(Arm, dhc, mother_age_cat, ga_del_by_us_date, ga_del_by_us_edd, 
+                                     ga_at_deliv_lmp, ga_weeks_recorded, m_age_enroll))
+plot_data = plot_data[complete.cases(plot_data), ]
+#summary(plot_data$ga_del_by_us_date)
+#summary(plot_data$ga_weeks_recorded)
+plot_data$ga_weeks_cts = plot_data$ga_weeks_recorded + rnorm(nrow(plot_data), 0, 0.15) 
+summary(plot_data$ga_weeks_cts)
+
+gaPlot <- ggplot(plot_data, aes(ga_weeks_cts, ga_del_by_us_date, colour = Arm)) +
+  stat_smooth(aes(group=1),method="lm", se=TRUE, linetype="dashed", size = 0.5) + geom_point(size = 1.5, alpha = 0.3)  + 
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", size = 0.2, alpha = 0.5)
+# + geom_jitter(height = 0.1, width = 0.1, alpha = 0.3)
+
+gaPlot + ggtitle(sprintf("Gestational Age at Delivery, N = %s", nrow(plot_data))) + 
+  labs(x = "Recorded in Maternity Register (wks)", y="By US Date (wks)")
+lm(formula = ga_del_by_us_date ~ ga_weeks_cts, plot_data)
+
+#IrisPlot
+sqrt(mean((plot_data$ga_del_by_us_date  - plot_data$ga_weeks_cts)^2))
+us_date = plot_data$ga_del_by_us_date < 37
+recorded = plot_data$ga_weeks_cts < 37
+
+mean(recorded[us_date< 37])
+
+#p_Nobs =  ggplot(plot_data, aes(Arm, N))
+#p_Nobs + geom_boxplot(outlier.shape = NA) + geom_jitter(width = 0.2)
+
+@
+
+<<SuperLearner, echo  = F>>=
+lib.g = list( "SL.xgboost", "SL.ranger", "SL.glmnet", "SL.bartMachine")
+lib.b = list( "SL.xgboost", "SL.randomForest", "SL.ranger", "SL.glmnet", "SL.bartMachine2")
+
+#train$y = as.numeric(train$ga_del_by_us_date < 37)
+train$y = as.numeric(train$ga_del_by_us_date)
+
+train$m_del = as.factor(format(train$date_del, "%m"))
+train$m_age_cat = as.factor(train$mother_age_cat)
+X = make_x(train)
+summary(X)
+
+library(SuperLearner)
+start_time = Sys.time()
+#gaussian model
+out_all = CV.SuperLearner(Y = train$y, X = X, family = gaussian(), 
+                      cvControl = list(V = 5, shuffle = T, validRows = NULL),
+                      innerCvControl = list(list(V = 5)),
+                       method = "method.NNLS", SL.library = lib.g)
+
+out_binom = CV.SuperLearner(Y = as.numeric(train$y < 37), X = X, family = binomial(), 
+                      cvControl = list(V = 5, shuffle = T, validRows = NULL, stratifyCV = T),
+                      innerCvControl = list(list(V = 5)),
+                      method = "method.NNloglik", SL.library = lib.b)
 
 
+out_recorded = CV.SuperLearner(Y = as.numeric(plot_data$ga_del_by_us_date), 
+                      X = data.frame(plot_data$ga_weeks_recorded, plot_data$dhc), 
+                      family = gaussian(), 
+                      cvControl = list(V = 5, shuffle = T, validRows = NULL),
+                      innerCvControl = list(list(V = 5)),
+                       method = "method.NNLS", SL.library = lib.g)
+out_recorded_binom = CV.SuperLearner(Y = as.numeric(plot_data$ga_del_by_us_date < 37), 
+                        X = data.frame(plot_data$ga_weeks_recorded, plot_data$dhc), 
+                        family = binomial(), 
+                      cvControl = list(V = 5, shuffle = T, validRows = NULL, stratifyCV = T),
+                      innerCvControl = list(list(V = 5)),
+                      method = "method.NNloglik", SL.library = lib.b)
+
+get_auc(out_binom, data.frame(y = as.numeric(train$y < 37)), 5, "ML Algorithm for Predicting Preterm Birth", type = "sens")
+get_auc(out_recorded_binom, data.frame(y = as.numeric(plot_data$ga_del_by_us_date < 37)), 5, "Register-Recorded GA for Predicting Preterm Birth", type = "sens")
+
+get_auc(out_binom, data.frame(y = as.numeric(train$y < 37)), folds = 5, type = "sens",  name= "")
+
+get_auc(out_recorded_binom, data.frame(y = as.numeric(plot_data$ga_del_by_us_date < 37)), 
+                                       type = "sens",
+                                       folds = 5, name= "")
+
+@
+
+<<plot_gaussian, echo = F>>=
+plot_data = subset(train, select = c(Arm, dhc, mother_age_cat, ga_del_by_us_date, ga_del_by_us_edd, 
+                                     ga_at_deliv_lmp, ga_weeks_recorded, m_age_enroll))
+plot_data = plot_data[complete.cases(plot_data), ]
+gaus_perf(out_recorded, data.frame(y = as.numeric(plot_data$ga_del_by_us_date)))
+
+##############
+#plot_data = plot_data[complete.cases(plot_data),]
+plot_data$predicted_recorded = out_recorded$SL.predict
+
+#((1-.148)/.148)/((1-.225)/.225)
 
 
+gaPlot <- ggplot(plot_data, aes(predicted_recorded, ga_del_by_us_date, colour = Arm)) +
+  stat_smooth(aes(group=1),method="lm", se=TRUE, linetype="dashed", size = 0.5) + geom_point(size = 1.5, alpha = 0.3)  + 
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", size = 0.2, alpha = 0.5)
+gaPlot + ggtitle(sprintf("Gestational Age at Delivery Predicted by Recorded Register GA, N = %s", nrow(plot_data))) +  labs(x = "Predicted by Recorded Register GA (wks)", y="By US Date (wks)")
+summary(lm(formula = ga_del_by_us_date ~ predicted_recorded, plot_data))
+
+
+plot_data = subset(train, select = c(Arm, dhc, mother_age_cat, ga_del_by_us_date, ga_del_by_us_edd, ga_at_deliv_lmp, ga_weeks_recorded, m_age_enroll))
+
+plot_data$predicted_all= out_all$SL.predict
+
+gaus_perf(out_all, train)
+
+
+gaPlot <- ggplot(plot_data, aes(predicted_all, ga_del_by_us_date, colour = Arm)) +
+  stat_smooth(aes(group=1),method="lm", se=TRUE, linetype="dashed", size = 0.5) + geom_point(size = 1.5, alpha = 0.3)  + 
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", size = 0.2, alpha = 0.5)
+gaPlot + ggtitle(sprintf("Gestational Age at Delivery Predicted by ML Algorithm, N = %s", nrow(plot_data))) +  labs(x = "Predicted by ML (wks)", y="By US Date (wks)")
+summary(lm(formula = ga_del_by_us_date ~ predicted_all, plot_data))
+
+
+######
+
+@
+
+<<PTB_rate, echo = F>>=
+get_n = function(y, cts) {
+  if(cts) {
+    out = sprintf('%s%%, N = %s', round(mean(y < 37) * 100, 2), length(y))
+    
+  } else {
+    out = sprintf('%s%%, N = %s', round(mean(y, na.rm = T) * 100, 2), length(y))
+    
+  }
+  out
+}
+
+plot_data = subset(train, select = c(Arm, dhc, mother_age_cat, ga_del_by_us_date, ga_del_by_us_edd, weight,
+                                     ga_at_deliv_lmp, ga_weeks_recorded, m_age_enroll))
+
+ptb_rate_us_date = sapply(split(plot_data, plot_data$Arm), function(x) get_n(x$ga_del_by_us_date, cts = T))
+ptb_rate_us_date
+#summary(plot_data$predicted_recorded)
+
+thresh = get_auc(out_binom, data.frame(y = as.numeric(train$y < 37)), folds = 5, type = "sens",  name= "")[2]
+
+plot_data$predicted_bin = as.numeric(out_binom$SL.predict >= thresh)
+mean(plot_data$predicted_bin[(plot_data$ga_del_by_us_date < 37)])
+mean(plot_data$predicted_bin[(plot_data$ga_del_by_us_date >= 37)])
+
+plot_data$predicted_cts = as.numeric(out_all$SL.predict)
+
+ptb_rate_us_predicted_bin = sapply(split(plot_data, plot_data$Arm), function(x) get_n(x$predicted_bin, cts = F))
+ptb_rate_us_predicted_bin
+
+ptb_rate_us_predicted = sapply(split(plot_data, plot_data$Arm), function(x) get_n(x$predicted_cts, cts = T))
+ptb_rate_us_predicted
+
+plot_data$ku_algorithm_usdate = as.numeric(plot_data$weight > 1000 & plot_data$weight < 2500 | 
+                                      plot_data$weight >= 2500 & plot_data$weight <= 2999 & 
+                                      plot_data$ga_del_by_us_date < 37)
+plot_data$ku_algorithm_edd = as.numeric(plot_data$weight > 1000 & plot_data$weight < 2500 | 
+                                      plot_data$weight >= 2500 & plot_data$weight <= 2999 & 
+                                      plot_data$ga_del_by_us_edd < 37)
+plot_data$ku_algorithm_rec = as.numeric(plot_data$weight > 1000 & plot_data$weight < 2500 | 
+                                      plot_data$weight >= 2500 & plot_data$weight <= 2999 & 
+                                      plot_data$ga_weeks_recorded < 37)
+
+ptb_rate_ku_us = sapply(split(plot_data, plot_data$Arm), function(x) get_n(x$ku_algorithm_usdate, cts = F))
+ptb_rate_ku_us
+ptb_rate_ku_edd = sapply(split(plot_data, plot_data$Arm), function(x) get_n(x$ku_algorithm_edd, cts = F))
+ptb_rate_ku_edd
+ptb_rate_ku_rec = sapply(split(plot_data, plot_data$Arm), function(x) get_n(x$ku_algorithm_rec, cts = F))
+ptb_rate_ku_rec
+
+ptb_rate_lmp =  sapply(split(plot_data, plot_data$Arm), function(x) get_n(x$ga_at_deliv_lmp, cts = T))
+
+
+plot_data = subset(train, select = c(Arm, dhc, mother_age_cat, ga_del_by_us_date, ga_del_by_us_edd, 
+                                     ga_at_deliv_lmp, ga_weeks_recorded, m_age_enroll))
+plot_data = plot_data[complete.cases(plot_data), ]
+
+ptb_rate_recorded = sapply(split(plot_data, plot_data$Arm), function(x) get_n(x$ga_weeks_recorded, cts = T))
+ptb_rate_recorded
+out = data.frame(rbind(ptb_rate_us_date, ptb_rate_us_predicted, ptb_rate_ku_us, ptb_rate_lmp, ptb_rate_recorded))
+out
+
+write.csv(out, file = "us-rates_by_algorithm.csv")
+mean(plot_data$predicted_cts)
+#ptb_rate_ga_algorithm_bin = 
+
+
+cor(train$y, out$SL.predict)
+wks_off = (out$SL.predict  - (traing$y))
+summary(wks_off)
+hist(wks_off)
+mean(wks_off <= 2)
+plot(traing$y, out$SL.predict, xlim = c(10,45), ylim = c(10,45), 
+     main = "Recorded vs. Predicted Gestational Age at Delivery (weeks)", 
+     xlab = "Recorded GA (US and LMP Based)", ylab = "Predicted")
+#plot(traing$y, out5_gaus_cc_ls$SL.predict, xlim = c(0,45), ylim = c(0,45))
+abline(0,1)
+abline(v = 37, lty = 2)
+#abline(v = 0.2)
+abline(h = 37, lty = 2)
+
+
+@
 \bigskip
 {\sffamily \textbf{R and package versions used}}
 \nopagebreak
