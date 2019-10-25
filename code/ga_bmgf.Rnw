@@ -96,7 +96,7 @@ source(here('code', "ga_pred", "functions.R"))
 @
 
 
-<<inclusion_criteria>>=
+<<inclusion_criteria, echo = F>>=
 A1 = c(333, 436, 544, 120, 110, 545, 111, 224, 221)
 A2 = c(435, 331, 541, 115, 113, 539, 226, 329, 332)
 

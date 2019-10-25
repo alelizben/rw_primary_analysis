@@ -78,9 +78,58 @@ source(here('code', "rw_consort_functions.R"))
 <<load_data, echo=TRUE>>=
 dat = read.csv(here("data", "epds_Data.csv"))
 df = read.csv(here('data', "ParticipantSurveyCohortMerged.csv"))
-
+df = read.csv(here('data', "ParticipantSurveyCohortMerged_15Oct2019_names\ removed.csv"))
+dim(df)
 by_fac = split(df,c(df$study_id_dhc))
+table(df$dhc)
+@
 
+<<inclusion_criteria, echo = F>>=
+A1 = c(333, 436, 544, 120, 110, 545, 111, 224, 221)
+A2 = c(435, 331, 541, 115, 113, 539, 226, 329, 332)
+
+A3 = c(330, 438, 540, 117, 116, 542, 112, 328, 223)
+A4 = c(437, 327, 543, 114, 119, 334, 118, 222, 225)
+
+arm1 = df %>% filter(dhc %in% A1 | dhc %in% A2)
+
+arm2 = df %>% filter(dhc %in% A3 | dhc %in% A4)
+
+arm1 = arm1 %>% filter(!(dhc %in% c(111, 331, 541, 545)))
+arm2 = arm2 %>% filter(!(dhc %in% c(114, 223, 334, 543)))
+
+@
+
+<<get_continuous_scale, echo = F>>=
+arm1$epds_tot_elfinal
+arm1 = split(arm1, arm1$dhc)
+arm2 = split(arm2, arm2$dhc)
+sapply(arm1 ,function(x) sum(!is.na(x$epds_tot_elfinal)))
+sapply(arm2 ,function(x) sum(!is.na(x$epds_tot_elfinal)))
+
+mean1 = round(sapply(arm1, function(x) mean(x$epds_tot_elfinal[!is.na(x$epds_tot_elfinal)])), 3)
+mean2 = round(sapply(arm2, function(x) mean(x$epds_tot_elfinal[!is.na(x$epds_tot_elfinal)])), 3)
+
+out1 = data.frame(mean = mean1, group = rep("sanc", length(mean1)))
+out2 = data.frame(mean = mean2, group = rep("ganc", length(mean2)))
+out = rbind(out1, out2)
+out
+ktest = kruskal.test(mean ~ group, data = out)
+ktest$
+summary(ktest)
+ttest = t.test(mean1, mean2, alternative = "two.sided", var.equal = FALSE)
+ttest
+#med1 = sapply(arm1, function(x) median(x$epds_tot_elfinal[!is.na(x$epds_tot_elfinal)]))
+#med2 = sapply(arm2, function(x) median(x$epds_tot_elfinal[!is.na(x$epds_tot_elfinal)]))
+
+med1
+mean1
+med2
+mean2
+med1
+@
+
+<<get_plot_data, echo = F>>=
 sapply(by_fac ,function(x) mean(x$depress13_el_new, na.rm = T))
 sapply(by_fac ,function(x) sum(!is.na(x$depress13_el_new)))
 dat$Arm = as.character(dat$Arm)

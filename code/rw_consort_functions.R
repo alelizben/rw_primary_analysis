@@ -155,6 +155,7 @@ get_consort = function(df, ga_type) {
   df$anc_ga_lt_24_wks = df$anc1ga_anc <= 24 & (df$enroll_but_no_anc1 == F)
   anc1_ga_lt_24 = table(df$anc_ga_lt_24_wks, useNA = 'always')
   anc1_ga_lt_24
+  ### type in consort 
   #anc1_ga_lt_24_valid_enroll_date = table((df$valid_anc1 == T & !is.na(df$anc_ga_lt_24_wks) &
   #                                         df$anc_ga_lt_24_wks == T), useNA = "always")
   
