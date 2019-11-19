@@ -82,6 +82,7 @@ You then load the R/qtl package using the {\tt library} function:
 ## marginal probability of weeks
 
 df = read.csv(here('data', 'ARMS1_2__3Corrected_4FinalAnalysisV4ConsentedLabelledRecodedOutliersMATERNALFACILITY24Sep2019WMatWtFU.csv'))
+df = read.csv(here('data', "MatCohort_USadded_30Oct19_BP.csv"))
 
 df[df == "#NULL!" | df == " " | df == ""] <- NA
 id_arm = read.csv(here('data', 'RW_Study_ID.csv'))
@@ -107,9 +108,6 @@ arm1 = df %>% filter(dhc %in% A1)
 arm2 = df %>% filter(dhc %in% A2)
 arm3 = df %>% filter(dhc %in% A3)
 arm4 = df %>% filter(dhc %in% A4)
-
-
-
 @
 
 
@@ -121,21 +119,42 @@ df4 = get_elig(arm4, "elig_enroll")
 
 df1 = get_elig(arm1, "elig_enroll")
 df3 = get_elig(arm3, "elig_enroll")
-us_1 = get_us(df1, 2) 
-us_3 = get_us(df3, 4)
-new_frame = make_data(us_1, us_3, "binomial", wk_thresh = 20, 1)
-# sum(us2$ga_anc1_recorded < 20, na.rm=T) + sum(us4$ga_anc1_recorded < 20, na.rm = T)
-# sum(us2$ga_at_us < 20, na.rm = T) + sum(us4$ga_at_us < 20, na.rm = T)
 
-us_2 = get_us(df2, 2) 
-us_4 = get_us(df4, 4)
-train = make_data(us_2, us_4, "binomial", wk_thresh = 20)
-#traing = make_data(us_2, us_4, "gaussian", wk_thresh = 20)
-train$Arm = ifelse(train$dhc %in% A2, "stANC", "gANC")
-#table(ifelse(trainb$dhc %in% A4, "stANC", "gANC"))
+df2 = get_elig(arm2, "analysis")
+df4 = get_elig(arm4, "analysis")
+
+df1 = get_elig(arm1, "analysis")
+df3 = get_elig(arm3, "analysis")
+
+
 
 @
 
+
+
+<<ULTRASOUND, echo = F>>=
+  us_1 = get_us(df1, 2) 
+  us_3 = get_us(df3, 4)
+  new_frame = make_data(us_1, us_3, "binomial", wk_thresh = 24, 1)
+# sum(us2$ga_anc1_recorded < 20, na.rm=T) + sum(us4$ga_anc1_recorded < 20, na.rm = T)
+# sum(us2$ga_at_us < 20, na.rm = T) + sum(us4$ga_at_us < 20, na.rm = T)
+
+  us_2 = get_us(df2, 2) 
+  us_4 = get_us(df4, 4)
+  train = make_data(us_2, us_4, "binomial", wk_thresh = 24, 2)
+  #train = train %>% filter(ga_at_us >= 6)
+  summary(train$ga_at_us)
+#traing = make_data(us_2, us_4, "gaussian", wk_thresh = 20)
+  train$Arm = ifelse(train$dhc %in% A2, "stANC", "gANC")
+#table(ifelse(trainb$dhc %in% A4, "stANC", "gANC"))
+  by_arm = split(train, train$Arm)
+
+  df1us = get_us_rates(by_arm$stANC)
+  df2us = get_us_rates(by_arm$gANC)
+
+  out2 = output_ptb_rate(df1us)
+  out4 = output_ptb_rate(df2us)
+@
 
 <<make_plots, echo = F >>=
 # cor_check = subset(plot_data, select = c(ga_weeks_recorded, ga_del_by_us_date))

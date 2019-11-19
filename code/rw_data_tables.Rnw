@@ -80,6 +80,7 @@ You then load the R/qtl package using the {\tt library} function:
 
 <<echo=FALSE, cache=FALSE>>=
 source(here('code', "rw_consort_functions.R"))
+source(here('code', "ga_pred", "functions.R"))
 @
 
 <<load_data, echo=TRUE>>=
@@ -87,9 +88,13 @@ source(here('code', "rw_consort_functions.R"))
 df = read.csv(here('data', 'ARMS1_2__3Corrected_4FinalAnalysisV4ConsentedLabelledRecodedOutliersMATERNALFACILITY18Sep2019.csv'))
 #df = read.csv(here('data', 'FinalAnalysisV4ConsentedLabelledRecodedOutliers28July2019.csv'))
 df = read.csv(here('data', 'ARMS1_2__3Corrected_4FinalAnalysisV4ConsentedLabelledRecodedOutliersMATERNALFACILITY24Sep2019WMatWtFU.csv'))
+
+df = read.csv(here('data', "MatCohort_USadded_30Oct19_BP.csv"))
 df[df == "#NULL!" | df == " " | df == ""] <- NA
 id_arm = read.csv(here('data', 'RW_Study_ID.csv'))
 
+sum(is.na(df$us_date))
+sum(is.na(df$us_adjga))
 ##split into arms
 @
 
@@ -115,7 +120,6 @@ A4 = c(437, 327, 543, 114, 119, 334, 118, 222, 225)
 
 
 <<get_elig, echo = F>>=
-  
   
   df1_valid = get_elig(arm1, "valid_enroll")
   df2_valid = get_elig(arm2, "valid_enroll")
@@ -202,17 +206,17 @@ var(yhat) = (SSE/(n-2)) %*% H
   df1 = get_elig(arm2, "analysis")
   df2 = get_elig(arm4, "analysis")
   
-df1us = get_us_rates(df1)
-df2us = get_us_rates(df2)
+  df1us = get_us_rates(df1)
+  df2us = get_us_rates(df2)
   
-    
+  #train = make_data(df1us, df2us, "binomial", wk_thresh = 20)
   out2 = output_ptb_rate(df1us)
   out4 = output_ptb_rate(df2us)
   
   library(openxlsx)
   out = list(out2, out4)
   names(out) = c("arm2", "arm4")
-  write.xlsx(out, file = "us_rec_rates_among_elig_primary_analysis.xlsx", row.names = T)
+  write.xlsx(out, file = sprintf("us_among_elig_primary_analysis_%s.xlsx", Sys.Date()), row.names = T)
   
 
 
@@ -220,8 +224,17 @@ df2us = get_us_rates(df2)
 get_ga_us(df_24)
 @
 
+<<get_nancy_number, echo = F>>=
+library(dplyr)
+df1 = arm1 %>% filter(arm1$eligible == 1 & arm1$deliveredbyMarch_31_2019 == 1)
+dim(df1)
+df1 = df1 %>% filter(!is.na(validgestatdel))
 
+df2 = arm2 %>% filter(arm2$eligible == 1 & arm2$deliveredbyMarch_31_2019 == 1)
+df2 = df2 %>% filter(!is.na(validgestatdel))
+nrow(df2) + nrow(df1)
 
+@
 
 \bigskip
 {\sffamily \textbf{R and package versions used}}

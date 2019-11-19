@@ -128,6 +128,7 @@ get_anc_covg = function(x){
   out
 }
 
+
 get_consort = function(df, ga_type) {
   #eligible_enroll_date
   #anc1_date = as.Date(df$anc1date_anc, format = "%m/%d/%Y")
@@ -247,29 +248,18 @@ get_consort = function(df, ga_type) {
 
 get_us_rates = function(df) {
   df$ga_weeks = as.numeric(as.character(df$ga_weeks))
-  # 
-  #   us_2 = get_us(arm2, 2)
-  #   us_4 = get_us(arm4, 4)
-  
-  #   
-  
-  #   table(us_2$usrec, useNA = "always")
-  #   table(us_4$usrec, useNA = "always")
-  
+
   ##us_rec
   # table(arm2$us_rec, useNA = "always")
   # table(arm4$us_rec, useNA = "always")
-  us2 = df %>% filter(us_rec == 1)
+  
+  #us2 = df %>% filter(us_rec == 1)
   #us4 = arm4 %>% filter(us_rec == 1)
-  us_2 = get_us(us2, 2)
+  us_2 = get_us(df, 2)
+  us_2 = df
   #us_4 = get_us(us4, 4)
   us_2 = us_2[!is.na(us_2$ga_del_by_us_date) | !is.na(us_2$ga_del_by_us_edd), ]
   #us_4 = us_4[!is.na(us_4$ga_del_by_us_date) | !is.na(us_4$ga_del_by_us_edd), ]
-  
-  # mean(is.na(us_2$ga_del_by_us_date))
-  # mean(is.na(us_2$ga_del_by_us_edd))
-  # mean(is.na(us_4$ga_del_by_us_date))
-  # mean(is.na(us_4$ga_del_by_us_edd))
   
   df2 = us_2 %>% filter(ga_del_by_us_edd >= 20 & ga_del_by_us_edd <= 44 | 
                           ga_del_by_us_date >= 20 & ga_del_by_us_date <= 44)
@@ -277,11 +267,6 @@ get_us_rates = function(df) {
   #                            ga_del_by_us_date >= 10 & ga_del_by_us_date <= 44)
   return(df2)
   
-  # summary(us_2$ga_del_by_us_date >= 10)
-  # summary(us_4$ga_del_by_us_date >= 10)
-  # 
-  # summary(us_2$ga_del_by_us_edd >= 10)
-  # summary(us_4$ga_del_by_us_edd >= 10)
   #among these women what is ptb rate
 }
 
@@ -302,6 +287,28 @@ output_ptb_rate = function(df) {
   names(out)[4] = "N"
   out$ptb_rate = round(out$TRUE./out$N, 3)
   
+  out
+}
+
+output_ptb_rate = function(df) {
+  out  = NULL
+  n_usdate = sum(!is.na(df$ga_del_by_us_date)) 
+  n_usedd = sum(!is.na(df$ga_del_by_us_edd))
+  
+  out$mean_ga_anc1 = get_n(df$ga_at_us)
+  ptb_usd2 = as.numeric(df$ga_del_by_us_date) < 37
+  out$ptb_usd = (get_n(ptb_usd2))
+  out$ga_usd = (get_n(df$ga_del_by_us_date))
+  
+  ptb_usd_edd2 = as.numeric(df$ga_del_by_us_edd) < 37
+  out$ptb_usd_edd = (get_n(ptb_usd_edd2))
+  out$ga_usd_edd = (get_n(df$ga_del_by_us_edd))
+  
+  out$among_lt_37wk_usd = get_n(df$ga_del_by_us_date[df$ga_del_by_us_date < 37])
+  out$among_lt_37wk_edd = get_n(df$ga_del_by_us_edd[df$ga_del_by_us_edd < 37])
+  
+  out$lbw_2500 = get_n(df$weight < 2500)
+  out = do.call(rbind, out)
   out
 }
 

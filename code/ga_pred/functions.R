@@ -268,7 +268,7 @@ get_us_fix_date = function(x, arm) {
 
 
 get_us = function(x, arm) {
-  study_id_enroll = x[, sprintf('study_id_full_new')]
+  study_id = x[, sprintf('study_id_full_new')]
   # table(arm2$SID)
   # mean(is.na(arm2$study_id_full_new))
   # dim(arm4)
@@ -393,10 +393,12 @@ get_us = function(x, arm) {
   
   ## ga weeks delivery recoded
   ga_weeks_recorded = x[, sprintf('ga_weeks')]
+  back_calc_dod_ga_recorded = ga_weeks_recorded - wks_from_anc1_to_del
+  
   usrec = x$us_rec
   
   # study_id_anc1,
-  final = data.frame(dhc, study_id_enroll, wks_from_anc1_to_del,
+  final = data.frame(dhc, study_id, wks_from_anc1_to_del,
                      wks_from_anc1_to_us,
                      wks_from_lmp_to_us, wks_from_lmp_to_del,
                      wks_from_us_to_del,
@@ -407,7 +409,7 @@ get_us = function(x, arm) {
                      ga_at_deliv_lmp, ga_at_delivery_by_ga_anc1, 
                      ga_at_delivery_by_edd_anc1,
                      ga_at_delivery_by_fh_anc1, ga_del_by_us_edd, 
-                     ga_weeks_recorded, usrec)
+                     ga_weeks_recorded, usrec, back_calc_dod_ga_recorded)
   
   
   frame = data.frame(m_age_enroll, m_age_anc1, m_stature, m_wt, parity, grav, fuel, 
@@ -440,8 +442,10 @@ make_data = function(us_2, us_4, family, wk_thresh, arm) {
   #us_4 = us_4[!is.na(us_4$ga_del_us), ]
   
   ## m_age_anc1 may reduce completion #
-  out2 = us_2[complete.cases(subset(us_2, select = -c(ga_weeks_recorded, study_id_enroll))),]
-  out4 = us_4[complete.cases(subset(us_4, select = -c(ga_weeks_recorded, study_id_enroll))),]
+  #out2 = us_2[complete.cases(subset(us_2, select = -c(ga_weeks_recorded, study_id))),]
+  #out4 = us_4[complete.cases(subset(us_4, select = -c(ga_weeks_recorded, study_id))),]
+  out2 = us_2
+  out4 = us_4
   dim(out2)
   dim(out4)
   
@@ -459,13 +463,6 @@ make_data = function(us_2, us_4, family, wk_thresh, arm) {
   wks22 = wks22[wks22$ga_at_us <= wk_thresh, ]
   dim(wks22)
   train = wks22
-  
-  # train = train[train$dhc != 113000000 & train$dhc != 119000000 & train$dhc != 226000000 & 
-  #                                     train$dhc != 334000000 & 
-  #                                     #train$dhc != 331000000 & 
-  #                                     train$dhc != 435000000
-  #                                 & train$dhc != 437000000 & train$dhc != 539000000, ]
-  # 
   
   m_age_diff = abs(train$m_age_anc1 - train$m_age_enroll)
   train = train[m_age_diff <= 3, ]
@@ -490,16 +487,7 @@ make_data = function(us_2, us_4, family, wk_thresh, arm) {
                          (ga_del_by_us_edd >= 24 & ga_del_by_us_edd <= 45)) 
     #new_us_del = rep(NA, nrow(tr))
     diff4 = (abs(as.numeric(tr$ga_del_by_us_date - tr$ga_del_by_us_edd)))
-    # summary(diff4)
-    # sum(tr$us_date < tr$date_anc1)
-    # 
-    # tr$ga_del_by_us_date[(tr$ga_del_by_us_date < 24 | tr$ga_del_by_us_date > 45)] <- 
-    #   tr$ga_del_by_us_edd[(tr$ga_del_by_us_date < 24 | tr$ga_del_by_us_date > 45)] 
-    # tr$ga_del_by_us_edd[(tr$ga_del_by_us_edd < 24 | tr$ga_del_by_us_edd > 45)] <- 
-    #   tr$ga_del_by_us_date[(tr$ga_del_by_us_edd < 24 | tr$ga_del_by_us_edd > 45)]
-    # 
-    # diff4 = (abs(as.numeric(tr$ga_del_by_us_date - tr$ga_del_by_us_edd)))
-    # summary(diff4)
+   
     # 
     tr = tr[diff4 < 4, ]
     # final_us = (tr$ga_del_by_us_date + tr$ga_del_by_us_edd)/2
@@ -515,8 +503,8 @@ make_data = function(us_2, us_4, family, wk_thresh, arm) {
   index_dhc = table(train$dhc)
   
   ##does  not drop 1 from study group and 1 from  control
-  index_dhc = index_dhc[index_dhc >= 11]
-  train = train[train$dhc %in% names(index_dhc), ]
+  #index_dhc = index_dhc[index_dhc >= 11]
+  #train = train[train$dhc %in% names(index_dhc), ]
   train$dhc = as.factor(train$dhc)
   
   # if (family == "binomial") {
@@ -524,7 +512,7 @@ make_data = function(us_2, us_4, family, wk_thresh, arm) {
   #   
   # } 
   
-  train = train[train$m_wt < 150, ]
+  #train = train[train$m_wt < 150, ]
   return(train)
 }
 
@@ -555,7 +543,7 @@ make_x = function(train) {
                                 wks_from_anc1_to_del, wks_from_lmp_to_us, mother_age_cat,
                                 #lmp_o, date_anc1_o, edd_o, us_date_o, date_del_o, edd_o, us_edd_o,
                                 ga_weeks_recorded, smoke, usrec, Arm,
-                                study_id_enroll,
+                                study_id,
                                 wks_from_anc1_to_us,
                                 date_del, date_anc1, lmp, ga_at_us, edd_by_us_date, 
                                 us_edd, us_date, ga_del_by_us_date, ga_del_by_us_edd))
