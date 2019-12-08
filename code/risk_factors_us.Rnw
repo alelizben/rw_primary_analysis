@@ -1,0 +1,178 @@
+\documentclass[12pt]{article}
+
+%\usepackage{times}
+\usepackage{hyperref}
+\hypersetup{pdfpagemode=UseNone} % don't show bookmarks on initial view
+\hypersetup{colorlinks, urlcolor={blue}}
+
+% revise margins
+\setlength{\headheight}{0.0in}
+\setlength{\topmargin}{0.0in}
+\setlength{\headsep}{0.0in}
+\setlength{\textheight}{8.65in}
+\setlength{\footskip}{0.35in}
+\setlength{\oddsidemargin}{0.0in}
+\setlength{\evensidemargin}{0.0in}
+\setlength{\textwidth}{6.5in}
+
+\setlength{\parskip}{6pt}
+\setlength{\parindent}{0pt}
+
+\begin{document}
+
+%\sffamily
+{\textbf{Gestational Age Prediction Using Stochastic Intervention for Variable Importance}}
+
+%\href{http://kbroman.org}{Karl W Broman}
+Alejandra Benitez and the Preterm Birth Initiative
+
+%This is a portion of the ``\href{http://www.rqtl.org/rqtltour2.pdf}{A shorter tour of R/qtl}''
+%tutorial, developed here in multiple formats to illustrate the use of knitr.
+%This particular document is written with \href{http://www.latex-project.org}{LaTeX}.
+
+<<knitr_options, include=FALSE>>=
+library(knitr)
+library(here)
+library(dplyr)
+library(geepack)
+library(parsedate)
+library(ggplot2)
+opts_chunk$set(fig.width=12, fig.height=4, fig.path='RnwFigs/',
+warning=FALSE, message=FALSE, tidy=FALSE)
+options(width=60)
+set.seed(53079239)
+# install R/qtl package if necessary:
+if(!require("qtl")) install.packages("qtl", repos="http://cran.us.r-project.org")
+@
+
+\bigskip
+%\sffamily 
+\textbf{Abstract}
+\newline
+%\nopagebreak
+
+\textit{Results}
+
+Our preliminary results indicate good classification potential across thresholds (cvAUC 0.75-0.85) while maintaining good specificity. The results also indicate potential to estimate GA at delivery within 3 weeks. A variable importance assessment is forthcoming.
+
+\textit{Conclusions}
+
+Our preliminary data implies our algorithm could guide GA assessment for our primary outcome analysis in Rwanda. Additionally, it has future potential as a pilot in clinical use, as a means for aiding decision-making in treatment and referral for vulnerable newborns. 
+
+
+\section{Results}
+\begin{itemize}
+\item Table 1 for population, age, SES, region
+\item cvAUC, variable importance can be presented by some dot plot
+\item linear plot of predicted continuous GA vs actual to show margins of error
+\\
+
+\end{itemize}
+%
+%\textbf{Results}
+%
+You then load the R/qtl package using the {\tt library} function:
+
+%<<load_qtl>>=
+%library(qtl)
+%@
+
+
+<<load_data, echo=TRUE>>=
+## marginal probability of weeks
+
+df = read.csv(here('data', 'ARMS1_2__3Corrected_4FinalAnalysisV4ConsentedLabelledRecodedOutliersMATERNALFACILITY24Sep2019WMatWtFU.csv'))
+df = read.csv(here('data', "MatCohort_USadded_30Oct19_BP.csv"))
+df[df == "#NULL!" | df == " " | df == ""] <- NA
+id_arm = read.csv(here('data', 'RW_Study_ID.csv'))
+
+##split into arms
+@
+
+
+<<echo=FALSE, cache=FALSE>>=
+source(here('code', "rw_consort_functions.R"))
+source(here('code', "ga_pred", "functions.R"))
+@
+
+
+<<inclusion_criteria, echo = F>>=
+A1 = c(333, 436, 544, 120, 110, 545, 111, 224, 221)
+A2 = c(435, 331, 541, 115, 113, 539, 226, 329, 332)
+
+A3 = c(330, 438, 540, 117, 116, 542, 112, 328, 223)
+A4 = c(437, 327, 543, 114, 119, 334, 118, 222, 225)
+
+arm1 = df %>% filter(dhc %in% A1)
+arm2 = df %>% filter(dhc %in% A2)
+arm3 = df %>% filter(dhc %in% A3)
+arm4 = df %>% filter(dhc %in% A4)
+@
+
+
+
+<<get_valid_women>>=
+
+# df2 = get_elig(arm2, "elig_enroll")
+# df4 = get_elig(arm4, "elig_enroll")
+# 
+# df1 = get_elig(arm1, "elig_enroll")
+# df3 = get_elig(arm3, "elig_enroll")
+
+df2 = get_elig(arm2, "analysis")
+df4 = get_elig(arm4, "analysis")
+
+df1 = get_elig(arm1, "analysis")
+df3 = get_elig(arm3, "analysis")
+
+@
+
+
+
+<<ULTRASOUND, echo = F>>=
+
+
+# sum(us2$ga_anc1_recorded < 20, na.rm=T) + sum(us4$ga_anc1_recorded < 20, na.rm = T)
+# sum(us2$ga_at_us < 20, na.rm = T) + sum(us4$ga_at_us < 20, na.rm = T)
+
+#us_2 = get_us(df2, 2) 
+#us_4 = get_us(df4, 4)
+df1us = get_us(df1, 1)
+df3us = get_us(df3, 3)
+
+df2us = get_us(df2, 2)
+df4us = get_us(df4, 4)
+
+df2us_ga = df2us %>% filter(ga_at_us >= 6 & ga_at_us <= 22)
+df4us_ga = df4us %>% filter(ga_at_us >= 6 & ga_at_us <= 22)
+
+df1_ga = df1us %>% filter(back_calc_dod_ga_recorded >= 6 & back_calc_dod_ga_recorded <= 22)
+df3_ga = df3us %>% filter(back_calc_dod_ga_recorded >= 6 & back_calc_dod_ga_recorded <= 22)
+
+## adds sufficient filters
+train = make_data(df2us_ga, df4us_ga, "binomial", wk_thresh = 22, 2)
+
+#train = train %>% filter(ga_at_us >= 6)
+summary(train$ga_at_us)
+#traing = make_data(us_2, us_4, "gaussian", wk_thresh = 20)
+train$Arm = ifelse(train$dhc %in% A2, "US_stANC", "US_gANC")
+table(train$Arm)
+#table(ifelse(trainb$dhc %in% A4, "stANC", "gANC"))
+by_arm = split(train, train$Arm)
+by_arm = lapply(by_arm, output_ptb_rate)
+
+
+@
+
+\bigskip
+{\sffamily \textbf{R and package versions used}}
+\nopagebreak
+
+<<sessionInfo, include=TRUE, echo=TRUE, results='markup'>>=
+sessionInfo()
+@
+
+% \bibliography{ga_pred} 
+% \bibliographystyle{ieeetr}
+
+\end{document}

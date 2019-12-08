@@ -109,18 +109,24 @@ get_elig = function(df, type) {
 }
 
 #df1 = get_elig(arm1, "elig_anc")
+#Proportion of women who attended at least 4 ANC visits
+#Proportion of women who attended ANC 1 before 16 completed weeks GA
+#Mean number of ANC visits attended per woman, in number of visits
+#Mean GA at first ANC visit, in weeks
 get_anc_covg = function(x){
+
   n_anc1ga = sum(!is.na(x$anc1ga_anc)) 
   n_anc = sum(!is.na(x$NumberANCs))
   n_anc1date = sum(!is.na(x$anc1date_anc))
   
   ga_lt_16 = c(table(x$anc1ga_anc < 16, useNA = "always"), n_anc1ga)
-  mean_anc = c(mean(x$NumberANCs), sd(x$NumberANCs), sum(is.na(x$NumberANCs)), n_anc)
-  gt_4_anc = c(table(x$NumberANCs >= 4, useNA = "always"), n_anc)
-  gt_2_anc = c(table(x$NumberANCs >= 2, useNA = "always"), n_anc1date)
+  mean_ga_anc1 = c(mean(x$anc1ga_anc, na.rm = T), sd(x$anc1ga_anc, na.rm = T), sum(is.na(x$anc1ga_anc)), n_anc1ga)
+  mean_num_anc = c(mean(x$NumberANCs), sd(x$NumberANCs), sum(is.na(x$NumberANCs)), n_anc)
+  gt_eq_4_anc = c(table(x$NumberANCs >= 4, useNA = "always"), n_anc)
+  #gt_2_anc = c(table(x$NumberANCs >= 2, useNA = "always"), n_anc1date)
   returned_2_anc_date = c(table(!is.na(x$date_ancfuvst_2), useNA = "always"), n_anc1date)
   
-  out = data.frame(rbind(ga_lt_16, gt_4_anc, gt_2_anc, returned_2_anc_date, mean_anc))
+  out = data.frame(rbind(ga_lt_16, gt_eq_4_anc, mean_num_anc, mean_ga_anc1))
   names(out)[4] = "total (non-na)"
   out$pct = out$TRUE./out$`total (non-na)`
   out = round(out, 3)
@@ -246,30 +252,6 @@ get_consort = function(df, ga_type) {
 }
 
 
-get_us_rates = function(df) {
-  df$ga_weeks = as.numeric(as.character(df$ga_weeks))
-
-  ##us_rec
-  # table(arm2$us_rec, useNA = "always")
-  # table(arm4$us_rec, useNA = "always")
-  
-  #us2 = df %>% filter(us_rec == 1)
-  #us4 = arm4 %>% filter(us_rec == 1)
-  us_2 = get_us(df, 2)
-  us_2 = df
-  #us_4 = get_us(us4, 4)
-  us_2 = us_2[!is.na(us_2$ga_del_by_us_date) | !is.na(us_2$ga_del_by_us_edd), ]
-  #us_4 = us_4[!is.na(us_4$ga_del_by_us_date) | !is.na(us_4$ga_del_by_us_edd), ]
-  
-  df2 = us_2 %>% filter(ga_del_by_us_edd >= 20 & ga_del_by_us_edd <= 44 | 
-                          ga_del_by_us_date >= 20 & ga_del_by_us_date <= 44)
-  # df4 = us_4 %>% filter(ga_del_by_us_edd >= 10 & ga_del_by_us_edd <= 44 | 
-  #                            ga_del_by_us_date >= 10 & ga_del_by_us_date <= 44)
-  return(df2)
-  
-  #among these women what is ptb rate
-}
-
 
 output_ptb_rate = function(df) {
   
@@ -296,6 +278,8 @@ output_ptb_rate = function(df) {
   n_usedd = sum(!is.na(df$ga_del_by_us_edd))
   
   out$mean_ga_anc1 = get_n(df$ga_at_us)
+  out$mean_ga_anc1_back_calc = get_n(df$back_calc_dod_ga_recorded)
+  out$mean_ga_anc1_lmp = get_n(df$ga_at_anc1_by_lmp)
   ptb_usd2 = as.numeric(df$ga_del_by_us_date) < 37
   out$ptb_usd = (get_n(ptb_usd2))
   out$ga_usd = (get_n(df$ga_del_by_us_date))

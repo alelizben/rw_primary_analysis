@@ -76,195 +76,12 @@ SL.bartMachine2 <- function(Y, X, newX, family, obsWeights, id,
   return(out)
 }
 
-
-# arm1 = read.csv('wide_form_deid_arm1_2018-07-03.csv')
-# 
-# arm2 = read.csv('wide_form_deid_arm2_2018-07-03.csv')
-# 
-# arm3 = read.csv('wide_form_deid_arm3_2018-07-03.csv')
-# 
-# arm4 = read.csv('wide_form_deid_arm4_2018-07-03.csv')
-
-get_us_fix_date = function(x, arm) {
-  x[x == "#NULL!" | x == " " ] <- NA
+## old functions for date cleaning
   #date_del = date_cleaning(as.Date(x[, 'date_delivery_mat'], "%Y-%m-%d"))
-  date_del = fix_date(x[, 'date_delivery_mat'])
-  #date_del2 = (x[, sprintf('date_delivery_mat.delivery_arm_%s', arm)])
-  #date_anc1 = date_cleaning(as.Date(x[, 'anc1date_anc.anc1_visit_arm_%s'], "%Y-%m-%d"))
-  date_anc1 = fix_date(x[, 'anc1date_anc'])
-  #  date_anc12 = (x[, sprintf('anc1date_anc.anc1_visit_arm_%s', arm)])
-  days_from_anc1_to_del = (date_del - date_anc1)
-  wks_from_anc1_to_del = (date_del - date_anc1)/7
-  
-  # 
-  # if (date_del < date_anc1) {
-  #   
-  #   print("deliver before anc1")
-  # }
-  # age_vars = arm2[,grep('m_age', names(arm2), value = T)]
-  # apply(age_vars, 2, function(x) mean(!is.na(x)))
-  # age_vars = arm4[,grep('m_age', names(arm4), value = T)]
-  # apply(age_vars, 2, function(x) mean(!is.na(x)))
-  # table(arm4$m_age_anc.anc1_visit_arm_4)
-  age_data = subset(x, select = c(m_age_anc, m_age))
-  mismatch_age = age_data[age_data$m_age_anc == age_data$m_age, ]
-  
-  m_age_enroll = as.numeric(as.character(x[ ,'m_age']))
-  m_age_anc1 = as.numeric(x[ ,'m_age_anc'])
-  #as.numeric
-  
-  m_stature =  as.numeric(x[ , 'ht_und150'])
-  m_wt = as.numeric(x[ , 'wt_1stvisit'])
-  #miscar = as.numeric(x[, sprintf("hx_rptdmiscar.anc1_visit_arm_%s", arm)])
-  #ptdel = as.numeric(x[, sprintf("hx_ptdlvry.anc1_visit_arm_%s", arm)])
-  #prevfsb = as.numeric(x[, sprintf("hx_prevfsb.anc1_visit_arm_%s", arm)])
-  parity = as.numeric(x[, "parity_anc"])
-  grav = as.numeric(x[, "gravidity_anc"])
-  
-  fuel = as.numeric(x[, sprintf("fuel_use")])
-  
-  enough_food = as.numeric(x[, sprintf("hh_enoughfood")])
-  ever_no_food = as.numeric(x[, sprintf("hh_evernofood")])
-  run_out_food = as.numeric(x[, sprintf("hh_runoutfood")])
-  not_enough_food = as.numeric(x[, sprintf("hh_notenoughfood")])
-  
-  smoke = as.numeric(x[, sprintf("preg_smoke")])
-  hh_smoker = as.numeric(x[, sprintf("hh_smoker")])
-  
-  alc = as.numeric(x[, sprintf("preg_alc")])
-  
-  sex = factor(x[, 'infant_sex'],
-               levels = c(1,2), labels = c(0,1))
-  muac = as.numeric(x[, sprintf('muac_birth')])
-  chest_c = as.numeric(x[, sprintf('cc_birth')])
-  weight = as.numeric(x[, sprintf('bwt_birth')])
-  
-  weight[!is.na(weight) & (weight/1000) < 1] <- (weight * 1000)[!is.na(weight) & (weight/1000) < 1]
-  
-  head_cir =  as.numeric(x[ ,sprintf('hc_birth')])
-  length_b =  as.numeric(x[ ,sprintf('length_birth')])
-  apgar1 = as.numeric(x[, sprintf('apgar_1mbirth')])
-  apgar5 = as.numeric(x[, sprintf('apgar_5mbirth')])
-  
-  # us,
-  frame = data.frame(m_age_enroll, m_age_anc1, m_stature, m_wt, parity, grav, fuel, enough_food, ever_no_food,
-                     run_out_food, not_enough_food, smoke, hh_smoker, alc,
-                     sex, weight, head_cir, length_b, apgar1, apgar5)
-  
-  
-  ## START OTHER SCRIPT ##
-  
-  study_id_enroll = x[, sprintf('study_id_full')]
-  study_id_anc1 = x[, sprintf('study_id_anc')]
-  dhc = substr(as.character(study_id_enroll), 1,3)
-  #dhc = x[, sprintf('study_id_dhc')]
-  #dhc = substr(study_id, 1, 3)
-  
-  ## Question 1 ##
-  #lmp = date_cleaning(as.Date(x[, sprintf('lmp_anc')], format = "%Y-%m-%d"))
-  lmp = fix_date(x[, sprintf('lmp_anc')])
-  wks_from_lmp_to_del = (date_del - lmp) / 7
-  
-  ga_at_anc1_by_lmp = (date_anc1 - lmp) / 7
-  
-  ga_at_deliv_lmp = (ga_at_anc1_by_lmp) + (days_from_anc1_to_del / 7)
-  ##create new variable "GA at delivery by LMP"
-  
-  
-  ## Question 2 ### Create GA at delivery by EDD at ANC1 ##
-  
-  #edd = date_cleaning(as.Date(x[, sprintf('edd_anc')], format = '%Y-%m-%d'))
-  edd = fix_date(x[, sprintf('edd_anc')])
-  
-  ga_at_delivery_by_edd_anc1 = (280 + (date_del - edd)) / 7
-  
-  #Question 3
-  ##GA AT DELIVERY BY GA AT ANC1 ##
-  ga_anc1_recorded = (x[, sprintf('anc1ga_anc')])
-  ga_anc1_by_edd = 40 - ((edd - date_anc1)/7)
-  
-  ga_at_delivery_by_ga_anc1 = ga_anc1_recorded + (days_from_anc1_to_del / 7)
-  
-  ########
-  ## Question 4 ### Create GA at delivery by HC US##
-  if (arm == 2 | arm == 4) {
-    #us_edd = date_cleaning(as.Date(x[, sprintf('edd_us')], format = "%Y-%m-%d"))
-    us_edd = fix_date(x[, sprintf('edd_us')])
-    
-    usga = (x[, sprintf('us_adjga')])
-    #table(usga)
-    new_usga = as.numeric(gsub("[^0-9\\.]", "", as.character(usga)))
-    ga_at_us = (ifelse((new_usga/10) >= 4, new_usga/10, new_usga))
-    
-    #print(c("ga_at_us_uncleaned", table(usga)))
-    #print(c("ga_at_us_clean", table(ga_at_us)))
-    
-    us_date =  date_cleaning(as.Date(x[, sprintf('us_date')], format = "%Y-%m-%d"))
-    us_date =  fix_date(x[, sprintf('us_date')])
-    
-    ga_del_by_us_date = ga_at_us + (date_del - us_date)/7
-    edd_by_us_date = 7*(40 - ga_at_us) + us_date
-    
-    ga_us_diff = date_del - us_edd
-    ga_del_us = (280 + ga_us_diff) / 7
-    
-  } else {
-    ga_del_us = rep(NA, nrow(x))
-    ga_at_us = rep(NA, nrow(x))
-    us_date = rep(NA, nrow(x))
-  }
-  
-  wks_from_lmp_to_us = (us_date - lmp)/7
-  
-  wks_from_anc1_to_us = (us_date - date_anc1)/7
-  wks_from_us_to_del = (date_del - us_date)/7
-  ######## Question 5 ## GA at delivery by FH @ anc1 ### 
-  
-  ####
-  fun_ht_anc1 = x[, sprintf('fundalht_1stvisit')]
-  ## check serial fundal height
-  
-  ga_at_delivery_by_fh_anc1 = fun_ht_anc1 + (days_from_anc1_to_del/7)
-  ga_at_delivery_by_fh_anc1
-  
-  ## ga weeks delivery recoded
-  ga_weeks_recorded = x[, sprintf('ga_weeks')]
-  ga_weeks = as.numeric(gsub("[^0-9\\.]", "", as.character(ga_weeks_recorded)))
-  ga_weeks_deliv_recorded = (ifelse((ga_weeks/10) >= 4.6, ga_weeks/10, ga_weeks))
-  #print(c("ga_weeks_deliv_recorded_unclean", table(ga_weeks_recorded)))
-  #print(c("ga_weeks_deliv_recorded_clean", table(ga_weeks_deliv_recorded)))
-  ga_weeks_deliv_recorded[ga_weeks_deliv_recorded == 9 | ga_weeks_deliv_recorded <= 6]  <- 41
-  ### GA WEEKS ################
-  #date_anc12, date_del2, date_anc1, date_del, lmp, days_from_anc1_to_del, 
-  #ga_at_delivery_by_ga_anc1, ga_at_delivery_by_edd_anc1, ga_at_delivery_by_us,
-  
-  
-  final = data.frame(study_id_enroll, study_id_anc1, dhc, wks_from_anc1_to_del,
-                     wks_from_anc1_to_us,
-                     wks_from_lmp_to_us, wks_from_lmp_to_del,
-                     wks_from_us_to_del,
-                     lmp, date_anc1, us_date, date_del, 
-                     ga_at_anc1_by_lmp, ga_anc1_by_edd, ga_anc1_recorded,
-                     ga_at_us, fun_ht_anc1,
-                     edd, edd_by_us_date, us_edd, ga_del_by_us_date,
-                     ga_at_deliv_lmp, ga_at_delivery_by_ga_anc1, 
-                     ga_at_delivery_by_edd_anc1,
-                     ga_at_delivery_by_fh_anc1, ga_del_us, ga_weeks_deliv_recorded)
-  
-  
+  #date_del = fix_date(x[, 'date_delivery_mat'])
+  #date_anc1 = fix_date(x[, 'anc1date_anc'])
   #index_bounds = filter_dates(date_anc1, "2016", "2019") & filter_dates(date_del, "2016", "2019") & filter_dates(lmp, "2016", "2019")
-  
-  #return(final)  
-  #return(final_bounds)
-  ## END OTHER SCRIPT ##
-  index_bounds = filter_dates(date_anc1, "2016", "2019") & filter_dates(date_del, "2016", "2019") & filter_dates(lmp, "2016", "2019")
   #final_bounds = final[which(index_bounds == T), ]
-  #
-  
-  #[which(index_bounds == T), ]
-  frame = data.frame(final, frame)
-  return(frame)
-}
 
 
 get_us = function(x, arm) {
@@ -337,7 +154,7 @@ get_us = function(x, arm) {
   hh_smoker = as.numeric(x[, sprintf("hh_smoker")])
   
   alc = as.numeric(x[, sprintf("preg_alc")])
-  
+  ubud = x$ubudehe_cat
   ###mother
   
   
@@ -373,16 +190,24 @@ get_us = function(x, arm) {
     ga_us_diff = date_del - us_edd
     ga_del_by_us_edd = (280 + ga_us_diff) / 7
     
+    wks_from_lmp_to_us = (us_date - lmp)/7
+    wks_from_anc1_to_us = (us_date - date_anc1)/7
+    wks_from_us_to_del = (date_del - us_date)/7
+    
+    final = data.frame(wks_from_anc1_to_us,
+                       wks_from_lmp_to_us, 
+                       wks_from_us_to_del,
+                       us_date,
+                       ga_at_us, edd_by_us_date, us_edd, ga_del_by_us_date,
+                       ga_del_by_us_edd)
+    
   } else {
     ga_del_us = rep(NA, nrow(x))
     ga_at_us = rep(NA, nrow(x))
     us_date = rep(NA, nrow(x))
+    final = data.frame(ga_del_us, ga_at_us, us_date)
   }
   
-  
-  wks_from_lmp_to_us = (us_date - lmp)/7
-  wks_from_anc1_to_us = (us_date - date_anc1)/7
-  wks_from_us_to_del = (date_del - us_date)/7
   ######## Question 5 ## GA at delivery by FH @ anc1 ### 
   
   ####
@@ -398,26 +223,43 @@ get_us = function(x, arm) {
   usrec = x$us_rec
   
   # study_id_anc1,
-  final = data.frame(dhc, study_id, wks_from_anc1_to_del,
-                     wks_from_anc1_to_us,
-                     wks_from_lmp_to_us, wks_from_lmp_to_del,
-                     wks_from_us_to_del,
-                     lmp, date_anc1, us_date, date_del, 
-                     ga_at_anc1_by_lmp, ga_anc1_by_edd, ga_anc1_recorded,
-                     ga_at_us, fun_ht_anc1,
-                     edd, edd_by_us_date, us_edd, ga_del_by_us_date,
+
+  
+  risk_factors = x %>% select(obhx_preterm, obhx_lbw, obhx_abortion, obhx_sb, obhx_28d_death)
+  risk_factors[is.na(risk_factors)] <- 0
+  sapply(risk_factors, table)
+  frame = data.frame(study_id, risk_factors, dhc, m_age_enroll, m_age_anc1, m_stature, m_wt, parity, grav, fuel, 
+                     enough_food, ever_no_food,
+                     run_out_food, not_enough_food, smoke, hh_smoker, alc, ubud,
+                     lmp, date_anc1,
+                     usrec, ga_at_anc1_by_lmp, ga_anc1_by_edd, ga_anc1_recorded,
+                     fun_ht_anc1, edd, 
+                     wks_from_anc1_to_del, wks_from_lmp_to_del, date_del, 
                      ga_at_deliv_lmp, ga_at_delivery_by_ga_anc1, 
                      ga_at_delivery_by_edd_anc1,
-                     ga_at_delivery_by_fh_anc1, ga_del_by_us_edd, 
-                     ga_weeks_recorded, usrec, back_calc_dod_ga_recorded)
-  
-  
-  frame = data.frame(m_age_enroll, m_age_anc1, m_stature, m_wt, parity, grav, fuel, 
-                     enough_food, ever_no_food,
-                     run_out_food, not_enough_food, smoke, hh_smoker, alc,
+                     ga_at_delivery_by_fh_anc1,
+                     ga_weeks_recorded,
+                     back_calc_dod_ga_recorded, 
                      sex, weight, head_cir, length_b, apgar1, apgar5)
-  frame = data.frame(final, frame)
+  frame = data.frame(frame, final)
   frame
+}
+
+choose_us = function(x) {
+  #%>% select(ga_del_by_us_date, ga_del_by_us_edd)
+  
+  tr = x %>% filter( (ga_del_by_us_date >= 24 & ga_del_by_us_date <= 45) | 
+                       (ga_del_by_us_edd >= 24 & ga_del_by_us_edd <= 45)) 
+  
+  #new_us_del = rep(NA, nrow(tr))
+  diff4 = (abs(as.numeric(tr$ga_del_by_us_date - tr$ga_del_by_us_edd)))
+  
+  # 
+  tr = tr[diff4 < 6, ]
+  # final_us = (tr$ga_del_by_us_date + tr$ga_del_by_us_edd)/2
+  # 
+  # tr$y = as.numeric(final_us)
+  return(tr)
 }
 
 make_data = function(us_2, us_4, family, wk_thresh, arm) {
@@ -433,14 +275,10 @@ make_data = function(us_2, us_4, family, wk_thresh, arm) {
     new = subset(new, select = -c(wks_from_anc1_to_us, wks_from_lmp_to_us, 
                                   wks_from_us_to_del, us_date, ga_at_us, 
                                   usrec, edd_by_us_date, us_edd, ga_del_by_us_date, ga_del_by_us_edd))
-    new = new[complete.cases(new), ]
+    #new = new[complete.cases(new), ]
     return(new)
   }
  
-  #us_2 = us_2[!is.na(us_2$us_adjga), ]
-  
-  #us_4 = us_4[!is.na(us_4$ga_del_us), ]
-  
   ## m_age_anc1 may reduce completion #
   #out2 = us_2[complete.cases(subset(us_2, select = -c(ga_weeks_recorded, study_id))),]
   #out4 = us_4[complete.cases(subset(us_4, select = -c(ga_weeks_recorded, study_id))),]
@@ -456,7 +294,7 @@ make_data = function(us_2, us_4, family, wk_thresh, arm) {
   #vars = vars[!(vars$wks_from_anc1_to_del < 0 & vars$wks_from_lmp_to_del < 0), ]
   vars = vars[!(vars$wks_from_anc1_to_del < 0 | vars$ga_at_anc1_by_lmp < 0), ]
   vars = vars[vars$ga_anc1_by_edd > 0,  ]
-  vars = vars[vars$wks_from_anc1_to_us >= -1,  ]
+  #vars = vars[vars$wks_from_anc1_to_us >= -1,  ]
   dim(vars)
   
   wks22 = vars
@@ -480,23 +318,11 @@ make_data = function(us_2, us_4, family, wk_thresh, arm) {
   dim(keep)
   #keep[keep$ga_at_deliv_lmp > 45,]
   #train = choose_lmp_or_us(keep, ga_lower_bd = 18, diff = 1.8)
-  choose_us = function(x) {
-    #%>% select(ga_del_by_us_date, ga_del_by_us_edd)
-
-    tr = x %>% filter( (ga_del_by_us_date >= 24 & ga_del_by_us_date <= 45) | 
-                         (ga_del_by_us_edd >= 24 & ga_del_by_us_edd <= 45)) 
-    #new_us_del = rep(NA, nrow(tr))
-    diff4 = (abs(as.numeric(tr$ga_del_by_us_date - tr$ga_del_by_us_edd)))
-   
-    # 
-    tr = tr[diff4 < 4, ]
-    # final_us = (tr$ga_del_by_us_date + tr$ga_del_by_us_edd)/2
-    # 
-    # tr$y = as.numeric(final_us)
-    return(tr)
-  }
   
-  train = choose_us(keep)
+  #choose_us
+  train = keep %>% filter( (ga_del_by_us_date >= 24 & ga_del_by_us_date <= 45) | 
+                       (ga_del_by_us_edd >= 24 & ga_del_by_us_edd <= 45)) 
+
 
   train = train[train$fuel != 4, ]
   
@@ -506,11 +332,89 @@ make_data = function(us_2, us_4, family, wk_thresh, arm) {
   #index_dhc = index_dhc[index_dhc >= 11]
   #train = train[train$dhc %in% names(index_dhc), ]
   train$dhc = as.factor(train$dhc)
+
   
-  # if (family == "binomial") {
-  #   train$y = as.numeric(train$y < 37)
-  #   
-  # } 
+  #train = train[train$m_wt < 150, ]
+  return(train)
+}
+
+## for SL
+
+
+
+make_data_SL = function(us_2, us_4, family, wk_thresh, arm) {
+  
+  if ( arm == 2 | arm == 4) {
+    sum(!is.na(us_2$ga_del_by_us_date))
+
+    us_2 = us_2[!is.na(us_2$ga_del_by_us_date) | !is.na(us_2$ga_del_by_us_edd), ]
+    # 
+    us_4 = us_4[!is.na(us_4$ga_del_by_us_date) | !is.na(us_4$ga_del_by_us_edd), ]
+    
+  } else if (arm == 1 | arm == 3) {
+    
+    new = (rbind(us_2, us_4))
+    new = subset(new, select = -c(wks_from_anc1_to_us, wks_from_lmp_to_us, 
+                                  wks_from_us_to_del, us_date, ga_at_us, 
+                                  usrec, edd_by_us_date, us_edd, ga_del_by_us_date, ga_del_by_us_edd))
+    #new = new[complete.cases(new), ]
+    return(new)
+  }
+  
+  ## m_age_anc1 may reduce completion #
+  out2 = us_2[complete.cases(subset(us_2, select = -c(ga_weeks_recorded, study_id))),]
+  out4 = us_4[complete.cases(subset(us_4, select = -c(ga_weeks_recorded, study_id))),]
+  #out2 = us_2
+  #out4 = us_4
+  dim(out2)
+  dim(out4)
+  
+  vars = rbind(out2, out4)
+  #vars = vars[vars$ga_at_anc1_by_lmp > 0  | vars$ga_anc1_recorded > 0, ]
+  table(vars$m_age_anc1)
+  table(vars$ga_at_anc1_by_lmp < 0)
+  #vars = vars[!(vars$wks_from_anc1_to_del < 0 & vars$wks_from_lmp_to_del < 0), ]
+  vars = vars[!(vars$wks_from_anc1_to_del < 0 | vars$ga_at_anc1_by_lmp < 0), ]
+  vars = vars[vars$ga_anc1_by_edd > 0,  ]
+  #vars = vars[vars$wks_from_anc1_to_us >= -1,  ]
+  dim(vars)
+  
+  wks22 = vars
+  wks22 = wks22[wks22$ga_at_us <= wk_thresh, ]
+  dim(wks22)
+  train = wks22
+  
+  m_age_diff = abs(train$m_age_anc1 - train$m_age_enroll)
+  train = train[m_age_diff <= 3, ]
+  train$ga_weeks_recorded = as.numeric(train$ga_weeks_recorded)
+  train$ga_del_by_us_date = as.numeric(train$ga_del_by_us_date)
+  train$ga_del_by_us_edd = as.numeric(train$ga_del_by_us_edd)
+  
+  train$mother_age_cat = rep(NA, nrow(train))
+  train$mother_age_cat[train$m_age_anc1 >= 12 & train$m_age_anc1 < 18] = "12-17" 
+  train$mother_age_cat[train$m_age_anc1 >= 18 & train$m_age_anc1 <= 35] = "18-35"
+  train$mother_age_cat[train$m_age_anc1 > 35] = "$>$ 35"
+  
+  #### choosing 
+  keep = train[get_diff(train, 24),]
+  dim(keep)
+  #keep[keep$ga_at_deliv_lmp > 45,]
+  #train = choose_lmp_or_us(keep, ga_lower_bd = 18, diff = 1.8)
+  
+  #choose_us
+  train = keep %>% filter( (ga_del_by_us_date >= 24 & ga_del_by_us_date <= 45) | 
+                             (ga_del_by_us_edd >= 24 & ga_del_by_us_edd <= 45)) 
+  
+  
+  train = train[train$fuel != 4, ]
+  
+  index_dhc = table(train$dhc)
+  
+  ##does  not drop 1 from study group and 1 from  control
+  #index_dhc = index_dhc[index_dhc >= 11]
+  #train = train[train$dhc %in% names(index_dhc), ]
+  train$dhc = as.factor(train$dhc)
+  
   
   #train = train[train$m_wt < 150, ]
   return(train)

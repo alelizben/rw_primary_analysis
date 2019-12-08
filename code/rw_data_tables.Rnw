@@ -86,6 +86,8 @@ source(here('code', "ga_pred", "functions.R"))
 <<load_data, echo=TRUE>>=
 ## marginal probability of weeks
 df = read.csv(here('data', 'ARMS1_2__3Corrected_4FinalAnalysisV4ConsentedLabelledRecodedOutliersMATERNALFACILITY18Sep2019.csv'))
+df = read.csv(here('data', 'ARMS1_2__3Corrected_4FinalAnalysisV4ConsentedLabelledRecodedOutliersMATERNALFACILITY16Sep2019.csv'))
+
 #df = read.csv(here('data', 'FinalAnalysisV4ConsentedLabelledRecodedOutliers28July2019.csv'))
 df = read.csv(here('data', 'ARMS1_2__3Corrected_4FinalAnalysisV4ConsentedLabelledRecodedOutliersMATERNALFACILITY24Sep2019WMatWtFU.csv'))
 
@@ -93,34 +95,34 @@ df = read.csv(here('data', "MatCohort_USadded_30Oct19_BP.csv"))
 df[df == "#NULL!" | df == " " | df == ""] <- NA
 id_arm = read.csv(here('data', 'RW_Study_ID.csv'))
 
+dim(df)
+eligible = df %>% filter(eligible == 1)
+table(eligible$StudyGrp)
+summary(eligible$StudyGrp)
+table(eligible$StudyGrp2)
+eligible = df %>% filter(eligible == 1 & deliveredbyMarch_31_2019)
+analysis = eligible %>% filter(!is.na(validgestatdel))
+
 sum(is.na(df$us_date))
 sum(is.na(df$us_adjga))
 ##split into arms
 @
 
 
-<<inclusion_criteria>>=
+<<inclusion_criteria, echo = F>>=
 A1 = c(333, 436, 544, 120, 110, 545, 111, 224, 221)
 A2 = c(435, 331, 541, 115, 113, 539, 226, 329, 332)
 
 A3 = c(330, 438, 540, 117, 116, 542, 112, 328, 223)
 A4 = c(437, 327, 543, 114, 119, 334, 118, 222, 225)
 
-  # arm1 = df %>% filter(dhc %in% A1)
-  # arm2 = df %>% filter(dhc %in% A2)
-  # arm3 = df %>% filter(dhc %in% A3)
-  # arm4 = df %>% filter(dhc %in% A4)
-  
-  arm1 = df %>% filter(dhc %in% A1 | dhc %in% A2)
-  #arm2 = df %>% filter(dhc %in% A2 | dhc %in% A1)
-  arm2 = df %>% filter(dhc %in% A3 | dhc %in% A4)
-  #arm4 = df %>% filter(dhc %in% A4)
-
 @
 
 
 <<get_elig, echo = F>>=
-  
+  arm1 = df %>% filter(dhc %in% A1 | dhc %in% A2)
+  arm2 = df %>% filter(dhc %in% A3 | dhc %in% A4)
+
   df1_valid = get_elig(arm1, "valid_enroll")
   df2_valid = get_elig(arm2, "valid_enroll")
   
@@ -132,6 +134,8 @@ A4 = c(437, 327, 543, 114, 119, 334, 118, 222, 225)
   
   #df1_ga = get_elig(arm1, "valid_anc_ga")
   #df2_ga = get_elig(arm2, "valid_anc_ga")
+  df1_elig = arm1 %>% filter(eligible == 1)
+  df2_elig = arm2 %>% filter(eligible == 1)
   
   sanc_valid = get_anc_covg(df1_valid)
   ganc_valid = get_anc_covg(df2_valid)
@@ -143,9 +147,9 @@ A4 = c(437, 327, 543, 114, 119, 334, 118, 222, 225)
   ganc_elig = get_anc_covg(df2_elig)
   
   library(openxlsx)
-  out = list(sanc_anc1, ganc_anc1)
+  out = list(sanc_elig, ganc_elig)
   names(out) = c("sanc", "ganc")
-  write.xlsx(out, file = sprintf("anc_covg_among_anc1_date_all_%s.xlsx", Sys.Date()), row.names = T)
+  write.xlsx(out, file = sprintf("anc_covg_among_studygrp_elig_%s.xlsx", Sys.Date()), row.names = T)
   #get_anc_covg(df1)
 
     ### secondary outcomes, unadjusted ###
@@ -161,11 +165,38 @@ A4 = c(437, 327, 543, 114, 119, 334, 118, 222, 225)
   
 @
 
+<<anc_covg_by_arm, echo = F>>=
+  arm1 = df %>% filter(dhc %in% A1)
+  arm2 = df %>% filter(dhc %in% A2)
+  arm3 = df %>% filter(dhc %in% A3)
+  arm4 = df %>% filter(dhc %in% A4)
 
-
-<<function_for_consort, echo = F>>=
-
-@
+  df1_elig = get_elig(arm1, "elig_enroll")
+  df2_elig = get_elig(arm2, "elig_enroll")
+  df3_elig = get_elig(arm3, "elig_enroll")
+  df4_elig = get_elig(arm4, "elig_enroll")
+  
+  arm1_elig = get_anc_covg(df1_elig)
+  arm2_elig = get_anc_covg(df2_elig)
+  arm3_elig = get_anc_covg(df3_elig)
+  arm4_elig = get_anc_covg(df4_elig)
+  
+  df1_elig = arm1 %>% filter(eligible == 1)
+  df2_elig = arm2 %>% filter(eligible == 1)
+  df3_elig = arm3 %>% filter(eligible == 1)
+  df4_elig = arm4 %>% filter(eligible == 1)
+  sum(nrow(df1_elig), nrow(df2_elig))
+  
+  arm1_elig = get_anc_covg(df1_elig)
+  arm2_elig = get_anc_covg(df2_elig)
+  arm3_elig = get_anc_covg(df3_elig)
+  arm4_elig = get_anc_covg(df4_elig)
+  
+  library(openxlsx)
+  out = list(arm1_elig, arm2_elig, arm3_elig, arm4_elig)
+  names(out) = c("arm1", "arm2", "arm3", "arm4")
+  write.xlsx(out, file = sprintf("anc_covg_by_arm_eligible_%s.xlsx", Sys.Date()), row.names = T)
+  @
 
 
 <<make_consort, echo = F>>=
