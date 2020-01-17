@@ -296,6 +296,22 @@ output_ptb_rate = function(df) {
   out
 }
 
+output_ptb = function(df) {
+  out  = NULL
+
+  out$mean_ga_deliv = get_n(df$validgestatdel)
+
+  out$ga_lt_37 = get_n(df$validgestatdel < 37)
+  #out$lbw_2500 = get_n(df$weight < 2500)
+  
+  out$mean_ga_anc1_back_calc = get_n(df$back_calc_dod_ga_recorded)
+  out$mean_ga_anc1_lmp = get_n(df$ga_at_anc1_by_lmp)
+ 
+
+  out = do.call(rbind, out)
+  out
+}
+
 
 get_ga_us= function(df){
   ## point of 2anc , <24 wks, enrolled, delivered march, mothers age

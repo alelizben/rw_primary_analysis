@@ -86,6 +86,7 @@ SL.bartMachine2 <- function(Y, X, newX, family, obsWeights, id,
 
 get_us = function(x, arm) {
   study_id = x[, sprintf('study_id_full_new')]
+  val_ga = x$validgestatdel
   # table(arm2$SID)
   # mean(is.na(arm2$study_id_full_new))
   # dim(arm4)
@@ -94,6 +95,8 @@ get_us = function(x, arm) {
   #study_id_enroll = x[, sprintf('study_id_enroll')]
   #study_id_anc1 = x[, sprintf('study_id_anc')]
   dhc = x$dhc
+  studygrp = x$StudyGrp
+  studyarm = x$StudyArm
   m_age_enroll = as.numeric(as.character(x[ ,'m_age']))
   m_age_anc1 = as.numeric(x[ ,'m_age_anc'])
   
@@ -202,10 +205,24 @@ get_us = function(x, arm) {
                        ga_del_by_us_edd)
     
   } else {
-    ga_del_us = rep(NA, nrow(x))
+    wks_from_lmp_to_us = NA
+    wks_from_anc1_to_us = NA
+    wks_from_us_to_del = NA
+    us_date = NA
+
     ga_at_us = rep(NA, nrow(x))
-    us_date = rep(NA, nrow(x))
-    final = data.frame(ga_del_us, ga_at_us, us_date)
+    edd_by_us_date =  rep(NA, nrow(x))
+    us_edd = rep(NA, nrow(x))
+    ga_del_by_us_date = rep(NA, nrow(x))
+    ga_del_by_us_edd = rep(NA, nrow(x))
+
+    
+    final = data.frame(wks_from_anc1_to_us,
+                       wks_from_lmp_to_us, 
+                       wks_from_us_to_del,
+                       us_date,
+                       ga_at_us, edd_by_us_date, us_edd, ga_del_by_us_date,
+                       ga_del_by_us_edd)
   }
   
   ######## Question 5 ## GA at delivery by FH @ anc1 ### 
@@ -228,13 +245,14 @@ get_us = function(x, arm) {
   risk_factors = x %>% select(obhx_preterm, obhx_lbw, obhx_abortion, obhx_sb, obhx_28d_death)
   risk_factors[is.na(risk_factors)] <- 0
   sapply(risk_factors, table)
-  frame = data.frame(study_id, risk_factors, dhc, m_age_enroll, m_age_anc1, m_stature, m_wt, parity, grav, fuel, 
+  frame = data.frame(study_id, studygrp, studyarm, risk_factors, dhc, m_age_enroll, m_age_anc1, m_stature, m_wt, parity, grav, fuel, 
                      enough_food, ever_no_food,
                      run_out_food, not_enough_food, smoke, hh_smoker, alc, ubud,
                      lmp, date_anc1,
                      usrec, ga_at_anc1_by_lmp, ga_anc1_by_edd, ga_anc1_recorded,
                      fun_ht_anc1, edd, 
                      wks_from_anc1_to_del, wks_from_lmp_to_del, date_del, 
+                     val_ga,
                      ga_at_deliv_lmp, ga_at_delivery_by_ga_anc1, 
                      ga_at_delivery_by_edd_anc1,
                      ga_at_delivery_by_fh_anc1,

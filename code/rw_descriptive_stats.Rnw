@@ -1,0 +1,311 @@
+\documentclass[12pt]{article}
+
+%\usepackage{times}
+\usepackage{hyperref}
+\hypersetup{pdfpagemode=UseNone} % don't show bookmarks on initial view
+\hypersetup{colorlinks, urlcolor={blue}}
+
+% revise margins
+\setlength{\headheight}{0.0in}
+\setlength{\topmargin}{0.0in}
+\setlength{\headsep}{0.0in}
+\setlength{\textheight}{8.65in}
+\setlength{\footskip}{0.35in}
+\setlength{\oddsidemargin}{0.0in}
+\setlength{\evensidemargin}{0.0in}
+\setlength{\textwidth}{6.5in}
+
+\setlength{\parskip}{6pt}
+\setlength{\parindent}{0pt}
+
+\begin{document}
+
+%\sffamily
+{\textbf{Gestational Age Prediction Using Stochastic Intervention for Variable Importance}}
+
+%\href{http://kbroman.org}{Karl W Broman}
+Alejandra Benitez and the Preterm Birth Initiative
+
+%This is a portion of the ``\href{http://www.rqtl.org/rqtltour2.pdf}{A shorter tour of R/qtl}''
+%tutorial, developed here in multiple formats to illustrate the use of knitr.
+%This particular document is written with \href{http://www.latex-project.org}{LaTeX}.
+
+<<knitr_options, include=FALSE>>=
+library(ggplot2)
+library(knitr)
+library(here)
+library(dplyr)
+library(geepack)
+library(parsedate)
+opts_chunk$set(fig.width=12, fig.height=4, fig.path='RnwFigs/',
+warning=FALSE, message=FALSE, tidy=FALSE)
+options(width=60)
+set.seed(53079239)
+# install R/qtl package if necessary:
+if(!require("qtl")) install.packages("qtl", repos="http://cran.us.r-project.org")
+@
+
+\bigskip
+%\sffamily 
+\textbf{Abstract}
+\newline
+%\nopagebreak
+
+\textit{Results}
+
+Our preliminary results indicate good classification potential across thresholds (cvAUC 0.75-0.85) while maintaining good specificity. The results also indicate potential to estimate GA at delivery within 3 weeks. A variable importance assessment is forthcoming.
+
+\textit{Conclusions}
+
+Our preliminary data implies our algorithm could guide GA assessment for our primary outcome analysis in Rwanda. Additionally, it has future potential as a pilot in clinical use, as a means for aiding decision-making in treatment and referral for vulnerable newborns. 
+
+
+\section{Results}
+\begin{itemize}
+\item Table 1 for population, age, SES, region
+\item cvAUC, variable importance can be presented by some dot plot
+\item linear plot of predicted continuous GA vs actual to show margins of error
+\\
+
+\end{itemize}
+%
+%\textbf{Results}
+%
+You then load the R/qtl package using the {\tt library} function:
+
+%<<load_qtl>>=
+%library(qtl)
+%@
+
+
+
+<<echo=FALSE, cache=FALSE>>=
+source(here('code', "rw_consort_functions.R"))
+source(here('code', "ga_pred", "functions.R"))
+@
+
+<<load_data, echo=TRUE>>=
+## marginal probability of weeks
+df = read.csv(here('data', 'ARMS1_2__3Corrected_4FinalAnalysisV4ConsentedLabelledRecodedOutliersMATERNALFACILITY18Sep2019.csv'))
+df = read.csv(here('data', 'ARMS1_2__3Corrected_4FinalAnalysisV4ConsentedLabelledRecodedOutliersMATERNALFACILITY16Sep2019.csv'))
+
+#df = read.csv(here('data', 'FinalAnalysisV4ConsentedLabelledRecodedOutliers28July2019.csv'))
+df = read.csv(here('data', 'ARMS1_2__3Corrected_4FinalAnalysisV4ConsentedLabelledRecodedOutliersMATERNALFACILITY24Sep2019WMatWtFU.csv'))
+
+df = read.csv(here('data', "MatCohort_USadded_30Oct19_BP.csv"))
+df[df == "#NULL!" | df == " " | df == ""] <- NA
+id_arm = read.csv(here('data', 'RW_Study_ID.csv'))
+
+
+## make quads 
+
+
+pair1 = c(1, 10, 8, 3, 13, 4, 2, 17, 5)
+pair2 = c(9, 11, 14, 16, 6, 15, 12, 18, 7)
+p2 = rep(NA, 18)
+p2[pair1] = pair2
+p2[pair2] = pair1
+
+df$Pair_US = p2[df$Pair]
+
+quad = strsplit(paste(df$Pair, df$Pair_US), " ")
+quad = paste(lapply(quad, function(j) sort(as.numeric(j))))
+df$quad = quad
+
+df$Pair_USUPT = paste(df$quad, df$StudyGrp)
+
+
+## make quads
+# & sb_birth == 3
+#& (sb_birth == 3 | is.na(sb_birth))
+eligible_only = df %>% filter(eligible == 1 )
+eligible = df %>% filter(eligible == 1 & deliveredbyMarch_31_2019 )
+analysis = eligible %>% filter(!is.na(validgestatdel))
+#analysis = analysis %>% filter(sb_birth != 1 & sb_birth !=2 )
+table(eligible_only$StudyGrp)
+table(analysis$StudyGrp)
+
+
+##split into arms
+@
+
+<<inclusion_criteria, echo = F>>=
+A1 = c(333, 436, 544, 120, 110, 545, 111, 224, 221)
+A2 = c(435, 331, 541, 115, 113, 539, 226, 329, 332)
+
+A3 = c(330, 438, 540, 117, 116, 542, 112, 328, 223)
+A4 = c(437, 327, 543, 114, 119, 334, 118, 222, 225)
+
+@
+
+<<make_plots, echo = F>>=
+
+
+  make_plot = function(df) {
+    #summary(analysis$bwt_birth[analysis$bwt_birth >= 1000])
+    #summary(analysis$bwt_birth[analysis$bwt_birth >= 7000])
+    #summary(df$bwt_birth[df$bwt_birth < 400])
+   # plot(df$validgestatdel, df$bwt_birth, xlab = "valid_gest_del", ylab = "bwt_birth", 
+    #     main = sprintf("Birth weight vs GA, N = %s", nrow(df)))
+          
+    #plot_data = subset(df, select = c(StudyGrp, dhc, mother_age_cat, validgestatdel, bwt_birth, 
+    #                                 ga_at_deliv_lmp, ga_weeks_recorded, m_age_enroll))
+      
+    plot_data = subset(df, select = c(StudyGrp, dhc, validgestatdel, bwt_birth))
+    plot_data$StudyGrp = as.factor(plot_data$StudyGrp)
+    
+    plot_data = plot_data[plot_data$bwt_birth >= 500 & plot_data$bwt_birth <= 8000, ]
+    
+    plot_data = plot_data[complete.cases(plot_data), ]
+    plot_data
+    
+    gaPlot <- ggplot(plot_data, aes(validgestatdel, bwt_birth, colour = StudyGrp)) +
+      stat_smooth(aes(group=1),method="lm", se=TRUE, linetype="dashed", size = 0.5) + 
+      geom_point(size = 1.5, alpha = 0.3)  +
+      geom_abline(slope = 1, intercept = 0, linetype = "dashed", size = 0.2, alpha = 0.5)
+    
+    gaPlot + ggtitle(sprintf("Birth Weight at Delivery vs Recorded GA, N = %s", nrow(plot_data))) +  
+        labs(x = "GA", y="birth weight")
+      
+     # summary(lm(formula = ga_del_by_us_date ~ predicted_recorded, plot_data))
+
+  }
+  make_plot(eligible_only)
+  make_plot(analysis)
+  
+
+
+@
+
+<<missingness, echo = F>>=
+
+
+  missing_vars = function(df) {
+    #summary(analysis$bwt_birth < 400)
+    #summary(df$bwt_birth[df$bwt_birth < 400])
+    out = c()
+    df = analysis
+    out$bwt = mean(!is.na(df$bwt_birth))
+    out$parity = mean(!is.na(df$parity_anc))
+    out$wt_1st_visit = mean(!is.na(df$wt_1stvisit))
+    #out$hgb = mean(!is.na(df$hgb_anc))
+    out$pr_known_hiv = mean(!is.na(df$prknwn_hivstt_anc))
+    out$hiv_test = mean(!is.na(df$hivtstres_anc))
+    out$height = mean(!is.na(df$ht_und150))
+    table(df$ht_und150)
+    out$muac = mean(!is.na(df$muac_anc___1))
+    #mean(!is.na(df$ubudehe_cat))
+    #mean(!is.na(df$health_ins_type))
+    mean(!is.na(df$edu_lvl_comp))
+    table(df$edu_lvl_comp)
+    mean(!is.na(df$hh_contribution))
+    table(df$hh_contribution)
+    #mean(!is.na(df$preg_smoke))
+    mean(!is.na(df$hh_smoker))
+    
+    ##may be more informative than preg_smoke
+    table(df$hh_smoker)
+    mean(!is.na(df$preg_alc))
+    table(df$preg_alc)
+    
+    ####
+    mean(!is.na(df$enroll_obhx___1))
+    #summary((df$enroll_obhx___1))
+    #mean(!is.na(df$obhx_preterm))
+    #mean(!is.na(df$ref_ancrf_anc))
+    table(df$mat_outcome)
+    #mean(!is.na(df$ref_ancrf_anc))
+
+    out = do.call(rbind, out)
+    out
+
+  }
+  missing_vars(eligible_only)
+  missing_vars(analysis)
+  plot_data = eligible_only
+  plot_data = plot_data[plot_data$bwt_birth >= 500 & plot_data$bwt_birth <= 8000, ]
+    
+  by_grp = split(plot_data, plot_data$StudyGrp)
+  
+  lapply(by_grp, function(j) mean(!is.na(j$validgestatdel)))
+  nrow(plot_data)
+  #late preterms not likely to be LBW
+  #among preterms, distbn of GA from 28-37
+  boxplot(plot_data$bwt_birth[plot_data$validgestatdel < 37 & plot_data$StudyGrp == 1],
+          plot_data$bwt_birth[plot_data$validgestatdel < 37 & plot_data$StudyGrp == 0])
+  boxplot()
+  
+  hist(plot_data$bwt_birth)
+  
+  # aged out of PTB but still LBW (as a reviewer how do you know )
+@
+
+<<by_pair, echo = F>>=
+  make_analysis_data = function(df, usupt) {
+
+      arm1 = df %>% filter(dhc %in% A1 | dhc %in% A3)
+      arm2 = df %>% filter(dhc %in% A2 | dhc %in% A4)
+      
+      df_all = data.frame(rbind(arm1, arm2))
+
+
+      df_all$id = as.numeric(df_all$dhc)
+      df_all$weight = 1/nrow(df_all)
+      
+      df_all$Y = df_all$validgestatdel
+      df_all$anc1ga_anc
+      table(df_all$NumberANCs)
+      df_all$at_least_4 = df_all$NumberANCs >= 4
+      df_all$at_least_3 = df_all$NumberANCs >= 3
+      df_all$ga_lt_16 = df_all$anc1ga_anc <= 16
+      table(df_all$ga_lt_16)
+      
+      if (usupt) {
+        df_all$A <- df_all$InUSUPTarm
+        df_all$Pair = df_all$Pair_USUPT
+        
+      } else {
+        df_all$A <- df_all$StudyGrp
+      }
+      data = subset(df_all, select = c(validgestatdel, at_least_4, ga_lt_16, at_least_3, anc1ga_anc, 
+                                   weight, A, id, Pair, Pair_USUPT, quad, InUSUPTarm, StudyGrp, StudyArm))
+      table(data$A, data$Pair)
+      return(data)
+    
+  }
+  eligible_studygrp = make_analysis_data(eligible_only, usupt = F)
+  analysis_studygrp = make_analysis_data(analysis, usupt = F)
+
+  eligible_usupt = make_analysis_data(eligible_only, usupt = T)
+  analysis_usupt = make_analysis_data(analysis, usupt = T)
+
+  #df_all$Yxwt = df_all$Y * df_all$weight
+ 
+  #X = aggregate(x = data, by = list(id = data$id), FUN = mean)
+  #Xwt = aggregate(x = data, by = list(id = data$id), FUN = sum)
+  #X$volume = table(df_all$id)
+  #X$weight_clust = Xwt$weight * 20
+  #X$Ysum = Xwt$Y
+  #X$Y_weight = X$Ysum * X$weight_clust
+  #by_pair = split(X, X$Pair)
+  lapply(split(analysis_studygrp, analysis_studygrp$Pair_USUPT), function(j) table(j$id))
+
+
+@
+
+
+\bigskip
+{\sffamily \textbf{R and package versions used}}
+\nopagebreak
+
+
+
+
+<<sessionInfo, include=TRUE, echo=TRUE, results='markup'>>=
+sessionInfo()
+@
+
+% \bibliography{ga_pred} 
+% \bibliographystyle{ieeetr}
+
+\end{document}

@@ -95,19 +95,38 @@ df = read.csv(here('data', "MatCohort_USadded_30Oct19_BP.csv"))
 df[df == "#NULL!" | df == " " | df == ""] <- NA
 id_arm = read.csv(here('data', 'RW_Study_ID.csv'))
 
-dim(df)
-eligible = df %>% filter(eligible == 1)
-table(eligible$StudyGrp)
-summary(eligible$StudyGrp)
-table(eligible$StudyGrp2)
-eligible = df %>% filter(eligible == 1 & deliveredbyMarch_31_2019)
-analysis = eligible %>% filter(!is.na(validgestatdel))
 
-sum(is.na(df$us_date))
-sum(is.na(df$us_adjga))
+## make quads 
+
+
+pair1 = c(1, 10, 8, 3, 13, 4, 2, 17, 5)
+pair2 = c(9, 11, 14, 16, 6, 15, 12, 18, 7)
+p2 = rep(NA, 18)
+p2[pair1] = pair2
+p2[pair2] = pair1
+
+df$Pair_US = p2[df$Pair]
+
+quad = strsplit(paste(df$Pair, df$Pair_US), " ")
+quad = paste(lapply(quad, function(j) sort(as.numeric(j))))
+df$quad = quad
+
+df$Pair_USUPT = paste(df$quad, df$StudyGrp)
+
+
+## make quads
+# & sb_birth == 3
+#& (sb_birth == 3 | is.na(sb_birth))
+eligible_only = df %>% filter(eligible == 1 )
+eligible = df %>% filter(eligible == 1 & deliveredbyMarch_31_2019 )
+analysis = eligible %>% filter(!is.na(validgestatdel))
+#analysis = analysis %>% filter(sb_birth != 1 & sb_birth !=2 )
+table(eligible_only$StudyGrp)
+table(analysis$StudyGrp)
+
+
 ##split into arms
 @
-
 
 <<inclusion_criteria, echo = F>>=
 A1 = c(333, 436, 544, 120, 110, 545, 111, 224, 221)
@@ -119,7 +138,129 @@ A4 = c(437, 327, 543, 114, 119, 334, 118, 222, 225)
 @
 
 
-<<get_elig, echo = F>>=
+<<by_pair, echo = F>>=
+  make_analysis_data = function(df, usupt) {
+
+      arm1 = df %>% filter(dhc %in% A1 | dhc %in% A3)
+      arm2 = df %>% filter(dhc %in% A2 | dhc %in% A4)
+      
+      df_all = data.frame(rbind(arm1, arm2))
+
+
+      df_all$id = as.numeric(df_all$dhc)
+      df_all$weight = 1/nrow(df_all)
+      
+      df_all$Y = df_all$validgestatdel
+      df_all$anc1ga_anc
+      table(df_all$NumberANCs)
+      df_all$at_least_4 = df_all$NumberANCs >= 4
+      df_all$at_least_3 = df_all$NumberANCs >= 3
+      df_all$ga_lt_16 = df_all$anc1ga_anc <= 16
+      table(df_all$ga_lt_16)
+      
+      if (usupt) {
+        df_all$A <- df_all$InUSUPTarm
+        df_all$Pair = df_all$Pair_USUPT
+        
+      } else {
+        df_all$A <- df_all$StudyGrp
+      }
+      data = subset(df_all, select = c(validgestatdel, at_least_4, ga_lt_16, at_least_3, anc1ga_anc, 
+                                   weight, A, id, Pair, Pair_USUPT, quad, InUSUPTarm, StudyGrp, StudyArm))
+      table(data$A, data$Pair)
+      return(data)
+    
+  }
+
+  summary_by_arm = function(df) {
+    
+    out = lapply(split(df, df$A), function(j) sapply(j[, 2:5], get_n))
+    out
+  
+  }
+  
+  library(openxlsx)
+  eligible_studygrp = make_analysis_data(eligible_only, usupt = F)
+  analysis_studygrp = make_analysis_data(analysis, usupt = F)
+  
+  eligible_study = summary_by_arm(eligible_studygrp)
+  analysis_study = summary_by_arm(analysis_studygrp)
+  
+  out_study = c(eligible_study, analysis_study)
+  write.xlsx(out_study, file = "summaries_table6_by_arm.xlsx")
+
+  eligible_usupt = make_analysis_data(eligible_only, usupt = T)
+  analysis_usupt = make_analysis_data(analysis, usupt = T)
+
+  out_usupt = c(summary_by_arm(eligible_usupt), summary_by_arm(analysis_usupt))
+  write.xlsx(out_usupt, file = "summaries_table7_by_arm.xlsx")
+  #df_all$Yxwt = df_all$Y * df_all$weight
+ 
+  #X = aggregate(x = data, by = list(id = data$id), FUN = mean)
+  #Xwt = aggregate(x = data, by = list(id = data$id), FUN = sum)
+  #X$volume = table(df_all$id)
+  #X$weight_clust = Xwt$weight * 20
+  #X$Ysum = Xwt$Y
+  #X$Y_weight = X$Ysum * X$weight_clust
+  #by_pair = split(X, X$Pair)
+  lapply(split(analysis_studygrp, analysis_studygrp$Pair_USUPT), function(j) table(j$id))
+
+
+@
+
+
+<<do_gee, echo = F>>=
+  do_gee = function(df_all, filename) {
+    
+    data = df_all
+
+
+  #data = subset(df_all, select = c(Y, A, id, Pair))
+  #data$U = 1
+
+  library(broom)
+  library(geepack)
+  gee.fit1 <- geese(formula(at_least_4 ~ A + Pair), id= id, data= data[order(data$id),], 
+                  family = binomial(link ="logit"), corstr="exch")
+  gee.fit2 <- geese(formula(ga_lt_16 ~ A + Pair), id= id, data= data[order(data$id),], 
+                    family = binomial(link ="logit"), corstr="exch")
+  gee.fit3 <- geese(formula(at_least_3 ~ A + Pair), id= id, data= data[order(data$id),], 
+                    family = binomial(link ="logit"), corstr="exch")
+  gee.fit4 <- geese(formula(anc1ga_anc ~ A + Pair), id= id, data= data[order(data$id),], 
+                    family = gaussian(link ="identity"), corstr="exch")
+  #save(gee.fit4, file = "gee_ga_at_anc1.RData")
+  write.csv(summary(gee.fit4)$mean, file = "gee_ga_at_anc1.csv")
+  
+  out = rbind(  summary(gee.fit1)$mean[2, c(1,2,4)],
+                summary(gee.fit2)$mean[2, c(1,2,4)],
+                summary(gee.fit3)$mean[2, c(1,2,4)],
+                summary(gee.fit4)$mean[2, c(1,2,4)])
+  rownames(out) = c("at_least_4anc", "ga_lt_16_anc1", "at_least_3anc", "mean_ga_anc1")
+  write.csv(out, file = sprintf("%s.csv", filename), row.names = T)
+  out 
+  }
+
+do_gee(eligible_studygrp, filename = "eligible_studygrp")
+do_gee(eligible_usupt, filename = "eligible_usupt")
+
+do_gee(analysis_studygrp, filename = "analysis_studygrp")
+do_gee(analysis_usupt, filename = "analysis_usupt")
+
+
+#qt(0.975, 9)
+gee_out = c((sum(gee.fit_unadj_exch_id$beta)), (gee.fit_unadj_exch_id$beta[1]), gee.fit_unadj_exch_id$beta[2], summ$mean$san.se[2],
+  gee.fit_unadj_exch_id$beta[2] - 1.96*summ$mean$san.se[2],
+  gee.fit_unadj_exch_id$beta[2] + 1.96*summ$mean$san.se[2],
+  summ$mean$p[2])
+names(gee_out) = c("Risk1", "Risk0", "RiskDiff", "SE", "CI.lo", "CI.hi", "pval")
+gee_out = data.frame(t(gee_out))
+xtable(gee_out, digits = 2)
+
+@
+
+
+
+<<get_elig_by_study_arm, echo = F>>=
   arm1 = df %>% filter(dhc %in% A1 | dhc %in% A2)
   arm2 = df %>% filter(dhc %in% A3 | dhc %in% A4)
 
@@ -164,6 +305,27 @@ A4 = c(437, 327, 543, 114, 119, 334, 118, 222, 225)
   
   
 @
+
+
+<<anc_covg_by_us_upt, echo = F>>=
+  arm1 = df %>% filter(dhc %in% A1 | dhc %in% A3)
+  arm2 = df %>% filter(dhc %in% A2 | dhc %in% A4)
+
+  df1_elig = arm1 %>% filter(eligible == 1)
+  df2_elig = arm2 %>% filter(eligible == 1)
+
+  arm1_elig = get_anc_covg(df1_elig)
+  arm2_elig = get_anc_covg(df2_elig)
+
+  library(openxlsx)
+  out = list(arm1_elig, arm2_elig)
+  names(out) = c("yes_us_upt", "no_us_upt")
+  write.xlsx(out, file = sprintf("anc_covg_by_us_upt_eligible_%s.xlsx", Sys.Date()), row.names = T)
+  
+  ##test these outcome differences
+  
+  @
+
 
 <<anc_covg_by_arm, echo = F>>=
   arm1 = df %>% filter(dhc %in% A1)

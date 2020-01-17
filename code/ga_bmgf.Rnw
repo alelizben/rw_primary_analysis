@@ -119,46 +119,77 @@ arm4 = df %>% filter(dhc %in% A4)
 
 
 
-<<get_valid_women>>=
+<<get_us_table_7, echo = F>>=
+  #eligible_only = df %>% filter(eligible == 1 )
+  eligible = df %>% filter(eligible == 1 & deliveredbyMarch_31_2019 )
+  analysis = eligible %>% filter(!is.na(validgestatdel))
 
-# df2 = get_elig(arm2, "elig_enroll")
-# df4 = get_elig(arm4, "elig_enroll")
-# 
-# df1 = get_elig(arm1, "elig_enroll")
-# df3 = get_elig(arm3, "elig_enroll")
+  #df2us = get_us(arm2, 2)
+  arm1 = analysis %>% filter(dhc %in% A1)
+  arm2 = analysis %>% filter(dhc %in% A2)
+  arm3 = analysis %>% filter(dhc %in% A3)
+  arm4 = analysis %>% filter(dhc %in% A4)
+  
+  no_us = get_us(rbind(arm1, arm3), 1)
+  us_arm = get_us(rbind(arm2, arm4), 4)
+  
+  all_arms = rbind(no_us, us_arm)
 
-df2 = get_elig(arm2, "analysis")
-df4 = get_elig(arm4, "analysis")
+  by_study_grp = (split(all_arms, all_arms$studygrp))
+  by_arm = lapply(split(us_arm, us_arm$studyarm), function(j) j %>% filter(ga_at_us >= 6 & ga_at_us <= 22))
+  lapply(by_study_grp, nrow)
+  lapply(by_arm, nrow)
 
-df1 = get_elig(arm1, "analysis")
-df3 = get_elig(arm3, "analysis")
-
+  get_us_stats = function(df) {
+    
+    out = c()
+    out$ga_at_birth_mat_register = df$val_ga
+    out$ga_at_birth_early_us = ifelse(!is.na(df$ga_del_by_us_date) &
+                                        df$ga_at_us >=6 & df$ga_at_us <= 22, df$ga_del_by_us_date, NA)
+    out$ga_at_birth_by_ga_anc1 = df$ga_at_delivery_by_ga_anc1
+    
+    out$ptb_by_mat_reg = df$ga_weeks < 37
+    out$ptb_by_early_us = ifelse(!is.na(df$ga_del_by_us_date) &
+                                        df$ga_at_us >=6 & df$ga_at_us <= 22, df$ga_del_by_us_date < 37, NA)
+    
+    out$ga_anc1_register = df$ga_anc1_recorded
+    out$ga_anc1_early_US = ifelse(!is.na(df$ga_at_us) &
+                                        df$ga_at_us >=6 & df$ga_at_us <= 22, (df$ga_at_us - df$wks_from_anc1_to_us), NA)
+    out$ga_anc1_back_calc_deliv = df$back_calc_dod_ga_recorded
+    
+    out = lapply(out, get_n)
+    out = do.call(rbind, out)
+    out
+  }
+  
+  lapply(by_study_grp, nrow)
+  by_arm_res = do.call(cbind, lapply(by_arm, get_us_stats))
+  study_grp_res = do.call(cbind, lapply(by_study_grp, get_us_stats))
+  write.csv(cbind(study_grp_res, by_arm_res), file = "us_table1_supplement.csv")
 @
 
 
 
 <<ULTRASOUND, echo = F>>=
-
-# sum(us2$ga_anc1_recorded < 20, na.rm=T) + sum(us4$ga_anc1_recorded < 20, na.rm = T)
-# sum(us2$ga_at_us < 20, na.rm = T) + sum(us4$ga_at_us < 20, na.rm = T)
-
-  #us_2 = get_us(df2, 2) 
-  #us_4 = get_us(df4, 4)
+  df2 = get_elig(arm2, "elig_enroll")
+  df4 = get_elig(arm4, "elig_enroll")
+# 
+  df1 = get_elig(arm1, "elig_enroll")
+  df3 = get_elig(arm3, "elig_enroll")
+  
   df1us = get_us(df1, 1)
-  df3us = get_us(df3, 3)
-  
   df2us = get_us(df2, 2)
+  df3us = get_us(df3, 3)
   df4us = get_us(df4, 4)
-  
-  df2us_ga = df2us %>% filter(ga_at_us >= 6 & ga_at_us <= 22)
-  df4us_ga = df4us %>% filter(ga_at_us >= 6 & ga_at_us <= 22)
-  
+
   df1_ga = df1us %>% filter(back_calc_dod_ga_recorded >= 6 & back_calc_dod_ga_recorded <= 22)
   df3_ga = df3us %>% filter(back_calc_dod_ga_recorded >= 6 & back_calc_dod_ga_recorded <= 22)
   
+  df2_ga = df2us %>% filter(ga_at_us >=6 & ga_at_us <= 22)
+  df4_ga = df4us %>% filter(ga_at_us >=6 & ga_at_us <= 22)
   ## for actual SL, make_data needs to filter out any facilities w <11 obs, check dates and completion of data
   ## currently this is not implemented for larger summary of sample
-  train = make_data(df2us_ga, df4us_ga, "binomial", wk_thresh = 22, 2)
+  train = make_data(df2_ga, df4_ga, "binomial", wk_thresh = 22, 2)
 
   #train = train %>% filter(ga_at_us >= 6)
   summary(train$ga_at_us)
@@ -171,8 +202,8 @@ df3 = get_elig(arm3, "analysis")
 
   by_arm$Arm1 = get_n(df1_ga$back_calc_dod_ga_recorded)
   by_arm$Arm3 = get_n(df3_ga$back_calc_dod_ga_recorded)
-  #library(openxlsx)
-  #write.xlsx(by_arm, file = "ga_us_and_back_calc_16-22wks.xlsx", row.names = T)
+  library(openxlsx)
+  write.xlsx(by_arm, file = "ga_us_and_back_calc_16-22wks.xlsx", row.names = T)
 @
 
 <<make_plots, echo = F >>=
