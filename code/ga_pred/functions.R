@@ -424,6 +424,9 @@ make_data_SL = function(us_2, us_4, family, wk_thresh, arm) {
                              (ga_del_by_us_edd >= 24 & ga_del_by_us_edd <= 45)) 
   
   
+  train = keep %>% filter( (ga_del_by_us_date >= 24 & ga_del_by_us_date <= 45)) 
+  
+  
   train = train[train$fuel != 4, ]
   
   index_dhc = table(train$dhc)
