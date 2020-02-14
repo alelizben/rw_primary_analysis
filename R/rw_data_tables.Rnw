@@ -128,7 +128,13 @@ plot(den)
 table(eligible_only$StudyGrp)
 table(analysis$StudyGrp)
 
-
+arm1 = df %>% filter(StudyArm == 1)
+arm2 = df %>% filter(StudyArm == 2)
+summary(!is.na(arm2$anc1date_anc))
+summary(!is.na(arm2$ancrf_anc___1))
+summary(arm2$timing_us)
+summary(!is.na(arm1$anc1date_anc))
+summary(!is.na(arm1$ancrf_anc___1))
 ##split into arms
 @
 
@@ -184,6 +190,7 @@ A4 = c(437, 327, 543, 114, 119, 334, 118, 222, 225)
   }
   
   library(openxlsx)
+  
   eligible_studygrp = make_analysis_data(eligible_only, usupt = F)
   analysis_studygrp = make_analysis_data(analysis, usupt = F)
   
