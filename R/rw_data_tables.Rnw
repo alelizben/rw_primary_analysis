@@ -52,7 +52,6 @@ if(!require("qtl")) install.packages("qtl", repos="http://cran.us.r-project.org"
 
 \textit{Results}
 
-Our preliminary results indicate good classification potential across thresholds (cvAUC 0.75-0.85) while maintaining good specificity. The results also indicate potential to estimate GA at delivery within 3 weeks. A variable importance assessment is forthcoming.
 
 \textit{Conclusions}
 
@@ -85,16 +84,12 @@ source(here('code', "ga_pred", "functions.R"))
 
 <<load_data, echo=TRUE>>=
 ## marginal probability of weeks
-df = read.csv(here('data', 'ARMS1_2__3Corrected_4FinalAnalysisV4ConsentedLabelledRecodedOutliersMATERNALFACILITY18Sep2019.csv'))
-df = read.csv(here('data', 'ARMS1_2__3Corrected_4FinalAnalysisV4ConsentedLabelledRecodedOutliersMATERNALFACILITY16Sep2019.csv'))
 
-#df = read.csv(here('data', 'FinalAnalysisV4ConsentedLabelledRecodedOutliers28July2019.csv'))
 df = read.csv(here('data', 'ARMS1_2__3Corrected_4FinalAnalysisV4ConsentedLabelledRecodedOutliersMATERNALFACILITY24Sep2019WMatWtFU.csv'))
 
 df = read.csv(here('data', "MatCohort_USadded_30Oct19_BP.csv"))
 df[df == "#NULL!" | df == " " | df == ""] <- NA
 id_arm = read.csv(here('data', 'RW_Study_ID.csv'))
-
 
 ## make quads 
 
@@ -130,11 +125,7 @@ table(analysis$StudyGrp)
 
 arm1 = df %>% filter(StudyArm == 1)
 arm2 = df %>% filter(StudyArm == 2)
-summary(!is.na(arm2$anc1date_anc))
-summary(!is.na(arm2$ancrf_anc___1))
-summary(arm2$timing_us)
-summary(!is.na(arm1$anc1date_anc))
-summary(!is.na(arm1$ancrf_anc___1))
+
 ##split into arms
 @
 
