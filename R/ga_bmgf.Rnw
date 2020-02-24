@@ -49,33 +49,7 @@ if(!require("qtl")) install.packages("qtl", repos="http://cran.us.r-project.org"
 %\sffamily 
 \textbf{Abstract}
 \newline
-%\nopagebreak
 
-\textit{Results}
-
-Our preliminary results indicate good classification potential across thresholds (cvAUC 0.75-0.85) while maintaining good specificity. The results also indicate potential to estimate GA at delivery within 3 weeks. A variable importance assessment is forthcoming.
-
-\textit{Conclusions}
-
-Our preliminary data implies our algorithm could guide GA assessment for our primary outcome analysis in Rwanda. Additionally, it has future potential as a pilot in clinical use, as a means for aiding decision-making in treatment and referral for vulnerable newborns. 
-
-
-\section{Results}
-\begin{itemize}
-\item Table 1 for population, age, SES, region
-\item cvAUC, variable importance can be presented by some dot plot
-\item linear plot of predicted continuous GA vs actual to show margins of error
-\\
-
-\end{itemize}
-%
-%\textbf{Results}
-%
-You then load the R/qtl package using the {\tt library} function:
-
-%<<load_qtl>>=
-%library(qtl)
-%@
 
 
 <<load_data, echo=TRUE>>=
@@ -110,10 +84,6 @@ arm1 = df %>% filter(dhc %in% A1)
 arm2 = df %>% filter(dhc %in% A2)
 arm3 = df %>% filter(dhc %in% A3)
 arm4 = df %>% filter(dhc %in% A4)
-
-
-  new = arm2 %>% select(obhx_preterm, obhx_lbw, obhx_abortion, obhx_sb, obhx_28d_death)
-  summary(new)
 
 @
 
@@ -217,7 +187,8 @@ plot_data$ga_weeks_cts = plot_data$ga_weeks_recorded + rnorm(nrow(plot_data), 0,
 summary(plot_data$ga_weeks_cts)
 
 gaPlot <- ggplot(plot_data, aes(ga_weeks_cts, ga_del_by_us_date, colour = Arm)) +
-  stat_smooth(aes(group=1),method="lm", se=TRUE, linetype="dashed", size = 0.5) + geom_point(size = 1.5, alpha = 0.3)  + 
+  stat_smooth(aes(group=1),method="lm", se=TRUE, linetype="dashed", size = 0.5) + 
+  geom_point(size = 1.5, alpha = 0.3)  + 
   geom_abline(slope = 1, intercept = 0, linetype = "dashed", size = 0.2, alpha = 0.5)
 # + geom_jitter(height = 0.1, width = 0.1, alpha = 0.3)
 
@@ -225,15 +196,6 @@ gaPlot + ggtitle(sprintf("Gestational Age at Delivery, N = %s", nrow(plot_data))
   labs(x = "Recorded in Maternity Register (wks)", y="By US Date (wks)")
 lm(formula = ga_del_by_us_date ~ ga_weeks_cts, plot_data)
 
-#IrisPlot
-sqrt(mean((plot_data$ga_del_by_us_date  - plot_data$ga_weeks_cts)^2))
-us_date = plot_data$ga_del_by_us_date < 37
-recorded = plot_data$ga_weeks_cts < 37
-
-mean(recorded[us_date< 37])
-
-#p_Nobs =  ggplot(plot_data, aes(Arm, N))
-#p_Nobs + geom_boxplot(outlier.shape = NA) + geom_jitter(width = 0.2)
 
 @
 
@@ -301,13 +263,16 @@ plot_data$predicted_recorded = out_recorded$SL.predict
 
 
 gaPlot <- ggplot(plot_data, aes(predicted_recorded, ga_del_by_us_date, colour = Arm)) +
-  stat_smooth(aes(group=1),method="lm", se=TRUE, linetype="dashed", size = 0.5) + geom_point(size = 1.5, alpha = 0.3)  + 
+  stat_smooth(aes(group=1),method="lm", se=TRUE, linetype="dashed", size = 0.5) + 
+  geom_point(size = 1.5, alpha = 0.3)  + 
   geom_abline(slope = 1, intercept = 0, linetype = "dashed", size = 0.2, alpha = 0.5)
 gaPlot + ggtitle(sprintf("Gestational Age at Delivery Predicted by Recorded Register GA, N = %s", nrow(plot_data))) +  labs(x = "Predicted by Recorded Register GA (wks)", y="By US Date (wks)")
 summary(lm(formula = ga_del_by_us_date ~ predicted_recorded, plot_data))
 
 
-plot_data = subset(train, select = c(Arm, dhc, mother_age_cat, ga_del_by_us_date, ga_del_by_us_edd, ga_at_deliv_lmp, ga_weeks_recorded, m_age_enroll))
+plot_data = subset(train, select = c(Arm, dhc, mother_age_cat, 
+                                     ga_del_by_us_date, ga_del_by_us_edd, ga_at_deliv_lmp, 
+                                     ga_weeks_recorded, m_age_enroll))
 
 plot_data$predicted_all= out_all$SL.predict
 
@@ -321,21 +286,9 @@ gaPlot + ggtitle(sprintf("Gestational Age at Delivery Predicted by ML Algorithm,
 summary(lm(formula = ga_del_by_us_date ~ predicted_all, plot_data))
 
 
-######
-
 @
 
 <<PTB_rate, echo = F>>=
-get_n = function(y, cts) {
-  if(cts) {
-    out = sprintf('%s%%, N = %s', round(mean(y < 37) * 100, 2), length(y))
-    
-  } else {
-    out = sprintf('%s%%, N = %s', round(mean(y, na.rm = T) * 100, 2), length(y))
-    
-  }
-  out
-}
 
 plot_data = subset(train, select = c(Arm, dhc, mother_age_cat, ga_del_by_us_date, ga_del_by_us_edd, weight,
                                      ga_at_deliv_lmp, ga_weeks_recorded, m_age_enroll))
@@ -347,16 +300,12 @@ ptb_rate_us_date
 thresh = get_auc(out_binom, data.frame(y = as.numeric(train$y < 37)), folds = 5, type = "sens",  name= "")[2]
 
 plot_data$predicted_bin = as.numeric(out_binom$SL.predict >= thresh)
-mean(plot_data$predicted_bin[(plot_data$ga_del_by_us_date < 37)])
-mean(plot_data$predicted_bin[(plot_data$ga_del_by_us_date >= 37)])
 
 plot_data$predicted_cts = as.numeric(out_all$SL.predict)
 
 ptb_rate_us_predicted_bin = sapply(split(plot_data, plot_data$Arm), function(x) get_n(x$predicted_bin, cts = F))
-ptb_rate_us_predicted_bin
 
 ptb_rate_us_predicted = sapply(split(plot_data, plot_data$Arm), function(x) get_n(x$predicted_cts, cts = T))
-ptb_rate_us_predicted
 
 plot_data$ku_algorithm_usdate = as.numeric(plot_data$weight > 1000 & plot_data$weight < 2500 | 
                                       plot_data$weight >= 2500 & plot_data$weight <= 2999 & 
@@ -369,11 +318,11 @@ plot_data$ku_algorithm_rec = as.numeric(plot_data$weight > 1000 & plot_data$weig
                                       plot_data$ga_weeks_recorded < 37)
 
 ptb_rate_ku_us = sapply(split(plot_data, plot_data$Arm), function(x) get_n(x$ku_algorithm_usdate, cts = F))
-ptb_rate_ku_us
+
 ptb_rate_ku_edd = sapply(split(plot_data, plot_data$Arm), function(x) get_n(x$ku_algorithm_edd, cts = F))
-ptb_rate_ku_edd
+
 ptb_rate_ku_rec = sapply(split(plot_data, plot_data$Arm), function(x) get_n(x$ku_algorithm_rec, cts = F))
-ptb_rate_ku_rec
+
 
 ptb_rate_lmp =  sapply(split(plot_data, plot_data$Arm), function(x) get_n(x$ga_at_deliv_lmp, cts = T))
 
@@ -383,36 +332,19 @@ plot_data = subset(train, select = c(Arm, dhc, mother_age_cat, ga_del_by_us_date
 plot_data = plot_data[complete.cases(plot_data), ]
 
 ptb_rate_recorded = sapply(split(plot_data, plot_data$Arm), function(x) get_n(x$ga_weeks_recorded, cts = T))
-ptb_rate_recorded
+
 out = data.frame(rbind(ptb_rate_us_date, ptb_rate_us_predicted, ptb_rate_ku_us, ptb_rate_lmp, ptb_rate_recorded))
-out
 
 write.csv(out, file = "us-rates_by_algorithm.csv")
-mean(plot_data$predicted_cts)
-#ptb_rate_ga_algorithm_bin = 
 
-
-cor(train$y, out$SL.predict)
-wks_off = (out$SL.predict  - (traing$y))
-summary(wks_off)
-hist(wks_off)
-mean(wks_off <= 2)
 plot(traing$y, out$SL.predict, xlim = c(10,45), ylim = c(10,45), 
      main = "Recorded vs. Predicted Gestational Age at Delivery (weeks)", 
      xlab = "Recorded GA (US and LMP Based)", ylab = "Predicted")
-#plot(traing$y, out5_gaus_cc_ls$SL.predict, xlim = c(0,45), ylim = c(0,45))
-abline(0,1)
-abline(v = 37, lty = 2)
-#abline(v = 0.2)
-abline(h = 37, lty = 2)
-
 
 @
 \bigskip
 {\sffamily \textbf{R and package versions used}}
 \nopagebreak
-
-
 
 
 <<sessionInfo, include=TRUE, echo=TRUE, results='markup'>>=

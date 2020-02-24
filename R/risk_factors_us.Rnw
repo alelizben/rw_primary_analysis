@@ -45,37 +45,6 @@ set.seed(53079239)
 if(!require("qtl")) install.packages("qtl", repos="http://cran.us.r-project.org")
 @
 
-\bigskip
-%\sffamily 
-\textbf{Abstract}
-\newline
-%\nopagebreak
-
-\textit{Results}
-
-Our preliminary results indicate good classification potential across thresholds (cvAUC 0.75-0.85) while maintaining good specificity. The results also indicate potential to estimate GA at delivery within 3 weeks. A variable importance assessment is forthcoming.
-
-\textit{Conclusions}
-
-Our preliminary data implies our algorithm could guide GA assessment for our primary outcome analysis in Rwanda. Additionally, it has future potential as a pilot in clinical use, as a means for aiding decision-making in treatment and referral for vulnerable newborns. 
-
-
-\section{Results}
-\begin{itemize}
-\item Table 1 for population, age, SES, region
-\item cvAUC, variable importance can be presented by some dot plot
-\item linear plot of predicted continuous GA vs actual to show margins of error
-\\
-
-\end{itemize}
-%
-%\textbf{Results}
-%
-You then load the R/qtl package using the {\tt library} function:
-
-%<<load_qtl>>=
-%library(qtl)
-%@
 
 
 <<load_data, echo=TRUE>>=

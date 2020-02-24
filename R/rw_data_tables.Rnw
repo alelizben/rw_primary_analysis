@@ -58,24 +58,6 @@ if(!require("qtl")) install.packages("qtl", repos="http://cran.us.r-project.org"
 Our preliminary data implies our algorithm could guide GA assessment for our primary outcome analysis in Rwanda. Additionally, it has future potential as a pilot in clinical use, as a means for aiding decision-making in treatment and referral for vulnerable newborns. 
 
 
-\section{Results}
-\begin{itemize}
-\item Table 1 for population, age, SES, region
-\item cvAUC, variable importance can be presented by some dot plot
-\item linear plot of predicted continuous GA vs actual to show margins of error
-\\
-
-\end{itemize}
-%
-%\textbf{Results}
-%
-You then load the R/qtl package using the {\tt library} function:
-
-%<<load_qtl>>=
-%library(qtl)
-%@
-
-
 
 <<echo=FALSE, cache=FALSE>>=
 source(here('code', "rw_consort_functions.R"))
@@ -85,7 +67,6 @@ source(here('code', "ga_pred", "functions.R"))
 <<load_data, echo=TRUE>>=
 ## marginal probability of weeks
 
-df = read.csv(here('data', 'ARMS1_2__3Corrected_4FinalAnalysisV4ConsentedLabelledRecodedOutliersMATERNALFACILITY24Sep2019WMatWtFU.csv'))
 
 df = read.csv(here('data', "MatCohort_USadded_30Oct19_BP.csv"))
 df[df == "#NULL!" | df == " " | df == ""] <- NA
@@ -114,14 +95,6 @@ df$Pair_USUPT = paste(df$quad, df$StudyGrp)
 #& (sb_birth == 3 | is.na(sb_birth))
 eligible_only = df %>% filter(eligible == 1 )
 eligible = df %>% filter(eligible == 1 & deliveredbyMarch_31_2019 )
-analys = eligible %>% filter(!is.na(ga_weeks))
-summary(analys$bwt_birth)
-analysis = eligible %>% filter(!is.na(validgestatdel))
-den = density(analys$bwt_birth[!is.na(analys$bwt_birth) & analys$bwt_birth <= 5000], n = 500)
-plot(den)
-#analysis = analysis %>% filter(sb_birth != 1 & sb_birth !=2 )
-table(eligible_only$StudyGrp)
-table(analysis$StudyGrp)
 
 arm1 = df %>% filter(StudyArm == 1)
 arm2 = df %>% filter(StudyArm == 2)
@@ -196,15 +169,7 @@ A4 = c(437, 327, 543, 114, 119, 334, 118, 222, 225)
 
   out_usupt = c(summary_by_arm(eligible_usupt), summary_by_arm(analysis_usupt))
   write.xlsx(out_usupt, file = "summaries_table7_by_arm.xlsx")
-  #df_all$Yxwt = df_all$Y * df_all$weight
  
-  #X = aggregate(x = data, by = list(id = data$id), FUN = mean)
-  #Xwt = aggregate(x = data, by = list(id = data$id), FUN = sum)
-  #X$volume = table(df_all$id)
-  #X$weight_clust = Xwt$weight * 20
-  #X$Ysum = Xwt$Y
-  #X$Y_weight = X$Ysum * X$weight_clust
-  #by_pair = split(X, X$Pair)
   lapply(split(analysis_studygrp, analysis_studygrp$Pair_USUPT), function(j) table(j$id))
 
 
@@ -293,19 +258,11 @@ xtable(gee_out, digits = 2)
   out = list(sanc_elig, ganc_elig)
   names(out) = c("sanc", "ganc")
   write.xlsx(out, file = sprintf("anc_covg_among_studygrp_elig_%s.xlsx", Sys.Date()), row.names = T)
-  #get_anc_covg(df1)
 
-    ### secondary outcomes, unadjusted ###
-
-  
-  #risk factor identified during ANC at any time
   names_rf = df[, grep( "ancrf", names(df), value = T)[1:7]]
   rf_anc = names_rf == 1
-  summary(rf_anc)
 
-  ### secondary outcomes, unadjusted ###
-  
-  
+
 @
 
 
@@ -324,8 +281,7 @@ xtable(gee_out, digits = 2)
   names(out) = c("yes_us_upt", "no_us_upt")
   write.xlsx(out, file = sprintf("anc_covg_by_us_upt_eligible_%s.xlsx", Sys.Date()), row.names = T)
   
-  ##test these outcome differences
-  
+
   @
 
 
@@ -376,23 +332,13 @@ xtable(gee_out, digits = 2)
   write_out = list(a1, a2)
   names(write_out) = c("sANC", "gANC")
 
-  ?write.csv
   openxlsx::write.xlsx(write_out, file = here('consort_by_group.xlsx'), row.names = T)
 @
-<<consented, echo = F>>=
-table(df$Consentgranted)
-summary(df)
-@
 
-<<get_mean_ci, echo = F>>=
-#simga hat squared is SSE divided by n-2
-var(yhat) = var(x %*% inv(t(x)%*%x)*t(x) %*% y)
-H = x %*% inv(t(x)%*%x)*t(x)
-var(yhat) = H %*% (SSE/(n-2)) %*% H
-var(yhat) = (SSE/(n-2)) %*% H
-@
 
 <<ULTRASOUND, echo = F>>=
+    
+  library(openxlsx)
   arm1 = df %>% filter(dhc %in% A1)
   arm2 = df %>% filter(dhc %in% A2)
   arm3 = df %>% filter(dhc %in% A3)
@@ -407,16 +353,11 @@ var(yhat) = (SSE/(n-2)) %*% H
   #train = make_data(df1us, df2us, "binomial", wk_thresh = 20)
   out2 = output_ptb_rate(df1us)
   out4 = output_ptb_rate(df2us)
-  
-  library(openxlsx)
+
   out = list(out2, out4)
   names(out) = c("arm2", "arm4")
   write.xlsx(out, file = sprintf("us_among_elig_primary_analysis_%s.xlsx", Sys.Date()), row.names = T)
   
-
-
-#get_ga_us(df_16)
-get_ga_us(df_24)
 @
 
 <<get_nancy_number, echo = F>>=

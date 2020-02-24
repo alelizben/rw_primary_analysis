@@ -50,32 +50,6 @@ if(!require("qtl")) install.packages("qtl", repos="http://cran.us.r-project.org"
 \newline
 %\nopagebreak
 
-\textit{Results}
-
-Our preliminary results indicate good classification potential across thresholds (cvAUC 0.75-0.85) while maintaining good specificity. The results also indicate potential to estimate GA at delivery within 3 weeks. A variable importance assessment is forthcoming.
-
-\textit{Conclusions}
-
-Our preliminary data implies our algorithm could guide GA assessment for our primary outcome analysis in Rwanda. Additionally, it has future potential as a pilot in clinical use, as a means for aiding decision-making in treatment and referral for vulnerable newborns. 
-
-
-\section{Results}
-\begin{itemize}
-\item Table 1 for population, age, SES, region
-\item cvAUC, variable importance can be presented by some dot plot
-\item linear plot of predicted continuous GA vs actual to show margins of error
-\\
-
-\end{itemize}
-%
-%\textbf{Results}
-%
-You then load the R/qtl package using the {\tt library} function:
-
-%<<load_qtl>>=
-%library(qtl)
-%@
-
 
 
 <<echo=FALSE, cache=FALSE>>=
@@ -116,23 +90,14 @@ df$quad = quad
 
 df$Pair_USUPT = paste(df$quad, df$StudyGrp)
 
-
-## make quads
-# & sb_birth == 3
-#& (sb_birth == 3 | is.na(sb_birth))
 eligible_only = df %>% filter(eligible == 1 )
 eligible = df %>% filter(eligible == 1 & deliveredbyMarch_31_2019 )
-#analys = eligible %>% filter(!is.na(ga_weeks))
-#summary(analys$bwt_birth)
+
 analysis = eligible %>% filter(!is.na(validgestatdel))
-#den = density(analys$bwt_birth[!is.na(analys$bwt_birth) & analys$bwt_birth <= 5000], n = 500)
-#plot(den)
-#analysis = analysis %>% filter(sb_birth != 1 & sb_birth !=2 )
+
 table(eligible_only$StudyGrp)
 table(analysis$StudyGrp)
 
-
-##split into arms
 @
 
 <<inclusion_criteria, echo = F>>=
@@ -159,30 +124,12 @@ make_ig = function(df, ga_type) {
       df$upper = ifelse(df$sex == 0,  girls_ig$pct97[match(ga_meas, girls_ig$ga)],
                     boys_ig$pct97[match(ga_meas, boys_ig$ga)])
 
-  # } else {
-  #   
-  #     df$clean_bwt = df$bwt_birth / 1000
-  #     df$clean_bwt[df$clean_bwt == 32] <- 3.2
-  #     df$clean_bwt[df$clean_bwt == 27] <- 2.7
-  #     df$lower = ifelse(df$infant_sex == 0, girls_ig$pct3[match(ga_meas, girls_ig$ga)],
-  #                   boys_ig$pct3[match(ga_meas, boys_ig$ga)])
-  #     df$upper = ifelse(df$infant_sex == 0,  girls_ig$pct97[match(ga_meas, girls_ig$ga)],
-  #                   boys_ig$pct97[match(ga_meas, boys_ig$ga)])
-  # 
-  #   
-  # }
-
 
   df$int_grwth =  as.numeric(df$clean_bwt >= df$lower & df$clean_bwt <= df$upper)
   return((df$int_grwth))
   
 }
 
-validg_all
-validg_ptb
-ga_wks_all
-ga_wks_ptb
-#dim(analysis[analysis$validgestatdel < 37, ])
 @
 
 <<among US only>>=
@@ -219,15 +166,6 @@ ga_wks_ptb
   out = rbind(validg_all, validg_ptb, ga_wks_all, ga_wks_ptb, us_all, us_ptb)
   out
   write.csv(out, file = "intergrowth_ga_neonatal_eligible.csv")
-
-  #   #train = train %>% filter(ga_at_us >= 6)
-#   summary(train$ga_at_us)
-# #traing = make_data(us_2, us_4, "gaussian", wk_thresh = 20)
-#   #train$Arm = ifelse(train$dhc %in% A2, "US_stANC", "US_gANC")
-#   table(train$studygrp)
-# #table(ifelse(trainb$dhc %in% A4, "stANC", "gANC"))
-#   by_arm = split(train, train$Arm)
-#   by_arm = lapply(by_arm, output_ptb_rate)
 
 @ 
 
@@ -271,8 +209,7 @@ ga_wks_ptb
     out
   
   }
-  
-  library(openxlsx)
+
   eligible_studygrp = make_analysis_data(eligible_only, usupt = F)
   analysis_studygrp = make_analysis_data(analysis, usupt = F)
   
@@ -287,15 +224,7 @@ ga_wks_ptb
 
   out_usupt = c(summary_by_arm(eligible_usupt), summary_by_arm(analysis_usupt))
   write.xlsx(out_usupt, file = "summaries_table7_by_arm.xlsx")
-  #df_all$Yxwt = df_all$Y * df_all$weight
- 
-  #X = aggregate(x = data, by = list(id = data$id), FUN = mean)
-  #Xwt = aggregate(x = data, by = list(id = data$id), FUN = sum)
-  #X$volume = table(df_all$id)
-  #X$weight_clust = Xwt$weight * 20
-  #X$Ysum = Xwt$Y
-  #X$Y_weight = X$Ysum * X$weight_clust
-  #by_pair = split(X, X$Pair)
+
   lapply(split(analysis_studygrp, analysis_studygrp$Pair_USUPT), function(j) table(j$id))
 
 
