@@ -31,42 +31,31 @@ Alejandra Benitez and the Preterm Birth Initiative
 %This particular document is written with \href{http://www.latex-project.org}{LaTeX}.
 
 <<knitr_options, include=FALSE>>=
-library(knitr)
-library(here)
-library(dplyr)
-library(geepack)
-library(parsedate)
-opts_chunk$set(fig.width=12, fig.height=4, fig.path='RnwFigs/',
-warning=FALSE, message=FALSE, tidy=FALSE)
-options(width=60)
-set.seed(53079239)
+  library(knitr)
+  library(here)
+  library(dplyr)
+  library(geepack)
+  library(parsedate)
+  library(broom)
+  library(geepack)
+  library(openxlsx)
+  opts_chunk$set(fig.width=12, fig.height=4, fig.path='RnwFigs/',
+  warning=FALSE, message=FALSE, tidy=FALSE)
+  options(width=60)
+  set.seed(53079239)
 # install R/qtl package if necessary:
 if(!require("qtl")) install.packages("qtl", repos="http://cran.us.r-project.org")
 @
 
-\bigskip
-%\sffamily 
-\textbf{Abstract}
-\newline
-%\nopagebreak
-
-\textit{Results}
-
-
-\textit{Conclusions}
-
-Our preliminary data implies our algorithm could guide GA assessment for our primary outcome analysis in Rwanda. Additionally, it has future potential as a pilot in clinical use, as a means for aiding decision-making in treatment and referral for vulnerable newborns. 
-
 
 
 <<echo=FALSE, cache=FALSE>>=
-source(here('code', "rw_consort_functions.R"))
-source(here('code', "ga_pred", "functions.R"))
+source(here('R', "rw_consort_functions.R"))
+source(here("ga_pred_files", "functions.R"))
 @
 
 <<load_data, echo=TRUE>>=
 ## marginal probability of weeks
-
 
 df = read.csv(here('data', "MatCohort_USadded_30Oct19_BP.csv"))
 df[df == "#NULL!" | df == " " | df == ""] <- NA
@@ -90,14 +79,11 @@ df$quad = quad
 df$Pair_USUPT = paste(df$quad, df$StudyGrp)
 
 
-## make quads
-# & sb_birth == 3
-#& (sb_birth == 3 | is.na(sb_birth))
 eligible_only = df %>% filter(eligible == 1 )
 eligible = df %>% filter(eligible == 1 & deliveredbyMarch_31_2019 )
 
-arm1 = df %>% filter(StudyArm == 1)
-arm2 = df %>% filter(StudyArm == 2)
+analysis = eligible %>% filter(!is.na(validgestatdel))
+
 
 ##split into arms
 @
@@ -113,38 +99,6 @@ A4 = c(437, 327, 543, 114, 119, 334, 118, 222, 225)
 
 
 <<by_pair, echo = F>>=
-  make_analysis_data = function(df, usupt) {
-
-      arm1 = df %>% filter(dhc %in% A1 | dhc %in% A3)
-      arm2 = df %>% filter(dhc %in% A2 | dhc %in% A4)
-      
-      df_all = data.frame(rbind(arm1, arm2))
-
-
-      df_all$id = as.numeric(df_all$dhc)
-      df_all$weight = 1/nrow(df_all)
-      
-      df_all$Y = df_all$validgestatdel
-      df_all$anc1ga_anc
-      table(df_all$NumberANCs)
-      df_all$at_least_4 = df_all$NumberANCs >= 4
-      df_all$at_least_3 = df_all$NumberANCs >= 3
-      df_all$ga_lt_16 = df_all$anc1ga_anc <= 16
-      table(df_all$ga_lt_16)
-      
-      if (usupt) {
-        df_all$A <- df_all$InUSUPTarm
-        df_all$Pair = df_all$Pair_USUPT
-        
-      } else {
-        df_all$A <- df_all$StudyGrp
-      }
-      data = subset(df_all, select = c(validgestatdel, at_least_4, ga_lt_16, at_least_3, anc1ga_anc, 
-                                   weight, A, id, Pair, Pair_USUPT, quad, InUSUPTarm, StudyGrp, StudyArm))
-      table(data$A, data$Pair)
-      return(data)
-    
-  }
 
   summary_by_arm = function(df) {
     
@@ -153,7 +107,9 @@ A4 = c(437, 327, 543, 114, 119, 334, 118, 222, 225)
   
   }
   
-  library(openxlsx)
+@
+
+<<run_fn_above, echo = F>>=
   
   eligible_studygrp = make_analysis_data(eligible_only, usupt = F)
   analysis_studygrp = make_analysis_data(analysis, usupt = F)
@@ -162,16 +118,12 @@ A4 = c(437, 327, 543, 114, 119, 334, 118, 222, 225)
   analysis_study = summary_by_arm(analysis_studygrp)
   
   out_study = c(eligible_study, analysis_study)
-  write.xlsx(out_study, file = "summaries_table6_by_arm.xlsx")
+  #write.xlsx(out_study, file = "summaries_table6_by_arm.xlsx")
 
   eligible_usupt = make_analysis_data(eligible_only, usupt = T)
   analysis_usupt = make_analysis_data(analysis, usupt = T)
 
   out_usupt = c(summary_by_arm(eligible_usupt), summary_by_arm(analysis_usupt))
-  write.xlsx(out_usupt, file = "summaries_table7_by_arm.xlsx")
- 
-  lapply(split(analysis_studygrp, analysis_studygrp$Pair_USUPT), function(j) table(j$id))
-
 
 @
 
@@ -181,196 +133,72 @@ A4 = c(437, 327, 543, 114, 119, 334, 118, 222, 225)
     
     data = df_all
 
-
-  #data = subset(df_all, select = c(Y, A, id, Pair))
-  #data$U = 1
-
-  library(broom)
-  library(geepack)
   gee.fit1 <- geese(formula(at_least_4 ~ A + Pair), id= id, data= data[order(data$id),], 
                   family = binomial(link ="logit"), corstr="exch")
-  gee.fit2 <- geese(formula(ga_lt_16 ~ A + Pair), id= id, data= data[order(data$id),], 
-                    family = binomial(link ="logit"), corstr="exch")
-  gee.fit3 <- geese(formula(at_least_3 ~ A + Pair), id= id, data= data[order(data$id),], 
+  gee.fit2 <- geese(formula(ga_lt_14 ~ A + Pair), id= id, data= data[order(data$id),], 
                     family = binomial(link ="logit"), corstr="exch")
   gee.fit4 <- geese(formula(anc1ga_anc ~ A + Pair), id= id, data= data[order(data$id),], 
+                    family = gaussian(link ="identity"), corstr="exch")
+  gee.fit5 <- geese(formula(NumberANCs ~ A + Pair), id= id, data= data[order(data$id),], 
                     family = gaussian(link ="identity"), corstr="exch")
   #save(gee.fit4, file = "gee_ga_at_anc1.RData")
   write.csv(summary(gee.fit4)$mean, file = "gee_ga_at_anc1.csv")
   
-  out = rbind(  summary(gee.fit1)$mean[2, c(1,2,4)],
-                summary(gee.fit2)$mean[2, c(1,2,4)],
-                summary(gee.fit3)$mean[2, c(1,2,4)],
-                summary(gee.fit4)$mean[2, c(1,2,4)])
-  rownames(out) = c("at_least_4anc", "ga_lt_16_anc1", "at_least_3anc", "mean_ga_anc1")
-  write.csv(out, file = sprintf("%s.csv", filename), row.names = T)
+  out = rbind(  c(summary(gee.fit1)$mean[2, c(1,2,4)], summary(gee.fit1)$mean[1, c(1,2,4)]),
+                c(summary(gee.fit2)$mean[2, c(1,2,4)], summary(gee.fit2)$mean[1, c(1,2,4)]),
+                c(summary(gee.fit4)$mean[2, c(1,2,4)], summary(gee.fit4)$mean[1, c(1,2,4)]),
+                c(summary(gee.fit5)$mean[2, c(1,2,4)], summary(gee.fit5)$mean[1, c(1,2,4)]))
+  rownames(out) = c("at_least_4anc", "ga_lt_14_anc1", "mean_ga_anc1", "mean_anc")
+  #write.csv(out, file = sprintf("%s_%s.csv", filename, Sys.Date()), row.names = T)
   out 
   }
+@
 
+<<aggregate_outcomes, echo = F>>=
+  ## for 
+  #df = analysis_studygrp
+  files = list.files(here('R', 'pvalues/'), pattern = "*.csv", full.names = F, recursive = FALSE)
+
+  
+  aggregate_cluster = function(df, file) {
+    by_arm = split(df, df$A)
+    pooled = lapply(by_arm, function(x) c(get_n(x$at_least_4), get_n(x$ga_lt_14), get_n(x$anc1ga_anc), get_n(x$NumberANCs)))
+    agg = aggregate(subset(df, select = c(id, A, at_least_4, ga_lt_14, anc1ga_anc, NumberANCs)), 
+                    by = list(id = df$id), FUN = function(x) mean(x, na.rm = T))
+    by_arm = split(agg, agg$A)
+    clustered = lapply(by_arm, function(j) apply(subset(j, select = c(at_least_4, ga_lt_14, anc1ga_anc, NumberANCs)), 2, 
+                                            function(x) round(c(mean(x), sd(x)), 4) ) )
+
+           
+    clustered[[1]] = rbind(clustered$`0`, pooled$`0`)
+    pval = read.csv(here('R copy', 'pvalues', file))
+    row.names(clustered[[1]]) = c("estimated cluster_adj", "sd cluster adj", "pooled estimate (n)")
+    clustered[[2]] = rbind(clustered$`1`, pooled$`1`, round(pval$p, 4))
+    row.names(clustered[[2]]) = c("estimated cluster_adj", "sd cluster adj", "pooled estimate (n)", "p-values")
+
+    names(clustered) = c("control", "intervention")
+    # aggregate(analysis_study)
+    clustered
+    
+  }
+  # write.xlsx(aggregate_cluster(eligible_studygrp, files[3]), row.names = T, file = sprintf("eligible_studygrp_pval_%s.xlsx", Sys.Date()))
+  
+
+  # write.xlsx(aggregate_cluster(eligible_usupt, files[4]), row.names = T, file = sprintf("eligible_usupt_pval_%s.xlsx", Sys.Date()))
+  
+
+
+@
+
+<<rungee, echo = F>>=
 do_gee(eligible_studygrp, filename = "eligible_studygrp")
 do_gee(eligible_usupt, filename = "eligible_usupt")
 
 do_gee(analysis_studygrp, filename = "analysis_studygrp")
 do_gee(analysis_usupt, filename = "analysis_usupt")
 
-
-#qt(0.975, 9)
-gee_out = c((sum(gee.fit_unadj_exch_id$beta)), (gee.fit_unadj_exch_id$beta[1]), gee.fit_unadj_exch_id$beta[2], summ$mean$san.se[2],
-  gee.fit_unadj_exch_id$beta[2] - 1.96*summ$mean$san.se[2],
-  gee.fit_unadj_exch_id$beta[2] + 1.96*summ$mean$san.se[2],
-  summ$mean$p[2])
-names(gee_out) = c("Risk1", "Risk0", "RiskDiff", "SE", "CI.lo", "CI.hi", "pval")
-gee_out = data.frame(t(gee_out))
-xtable(gee_out, digits = 2)
-
 @
 
-
-
-<<get_elig_by_study_arm, echo = F>>=
-  arm1 = df %>% filter(dhc %in% A1 | dhc %in% A2)
-  arm2 = df %>% filter(dhc %in% A3 | dhc %in% A4)
-
-  df1_valid = get_elig(arm1, "valid_enroll")
-  df2_valid = get_elig(arm2, "valid_enroll")
-  
-  df1_anc1 = get_elig(arm1, "valid_anc_date")
-  df2_anc1 = get_elig(arm2, "valid_anc_date")
-  
-  df1_elig = get_elig(arm1, "elig_enroll")
-  df2_elig = get_elig(arm2, "elig_enroll")
-  
-  #df1_ga = get_elig(arm1, "valid_anc_ga")
-  #df2_ga = get_elig(arm2, "valid_anc_ga")
-  df1_elig = arm1 %>% filter(eligible == 1)
-  df2_elig = arm2 %>% filter(eligible == 1)
-  
-  sanc_valid = get_anc_covg(df1_valid)
-  ganc_valid = get_anc_covg(df2_valid)
-  
-  sanc_anc1 = get_anc_covg(df1_anc1)
-  ganc_anc1 = get_anc_covg(df2_anc1)
-  
-  sanc_elig = get_anc_covg(df1_elig)
-  ganc_elig = get_anc_covg(df2_elig)
-  
-  library(openxlsx)
-  out = list(sanc_elig, ganc_elig)
-  names(out) = c("sanc", "ganc")
-  write.xlsx(out, file = sprintf("anc_covg_among_studygrp_elig_%s.xlsx", Sys.Date()), row.names = T)
-
-  names_rf = df[, grep( "ancrf", names(df), value = T)[1:7]]
-  rf_anc = names_rf == 1
-
-
-@
-
-
-<<anc_covg_by_us_upt, echo = F>>=
-  arm1 = df %>% filter(dhc %in% A1 | dhc %in% A3)
-  arm2 = df %>% filter(dhc %in% A2 | dhc %in% A4)
-
-  df1_elig = arm1 %>% filter(eligible == 1)
-  df2_elig = arm2 %>% filter(eligible == 1)
-
-  arm1_elig = get_anc_covg(df1_elig)
-  arm2_elig = get_anc_covg(df2_elig)
-
-  library(openxlsx)
-  out = list(arm1_elig, arm2_elig)
-  names(out) = c("yes_us_upt", "no_us_upt")
-  write.xlsx(out, file = sprintf("anc_covg_by_us_upt_eligible_%s.xlsx", Sys.Date()), row.names = T)
-  
-
-  @
-
-
-<<anc_covg_by_arm, echo = F>>=
-  arm1 = df %>% filter(dhc %in% A1)
-  arm2 = df %>% filter(dhc %in% A2)
-  arm3 = df %>% filter(dhc %in% A3)
-  arm4 = df %>% filter(dhc %in% A4)
-
-  df1_elig = get_elig(arm1, "elig_enroll")
-  df2_elig = get_elig(arm2, "elig_enroll")
-  df3_elig = get_elig(arm3, "elig_enroll")
-  df4_elig = get_elig(arm4, "elig_enroll")
-  
-  arm1_elig = get_anc_covg(df1_elig)
-  arm2_elig = get_anc_covg(df2_elig)
-  arm3_elig = get_anc_covg(df3_elig)
-  arm4_elig = get_anc_covg(df4_elig)
-  
-  df1_elig = arm1 %>% filter(eligible == 1)
-  df2_elig = arm2 %>% filter(eligible == 1)
-  df3_elig = arm3 %>% filter(eligible == 1)
-  df4_elig = arm4 %>% filter(eligible == 1)
-  sum(nrow(df1_elig), nrow(df2_elig))
-  
-  arm1_elig = get_anc_covg(df1_elig)
-  arm2_elig = get_anc_covg(df2_elig)
-  arm3_elig = get_anc_covg(df3_elig)
-  arm4_elig = get_anc_covg(df4_elig)
-  
-  library(openxlsx)
-  out = list(arm1_elig, arm2_elig, arm3_elig, arm4_elig)
-  names(out) = c("arm1", "arm2", "arm3", "arm4")
-  write.xlsx(out, file = sprintf("anc_covg_by_arm_eligible_%s.xlsx", Sys.Date()), row.names = T)
-  @
-
-
-<<make_consort, echo = F>>=
-  a1 = get_consort(arm1)
-  a2 = get_consort(arm2)
-  
-  
-  a3 = get_consort(arm3)
-  a4 = get_consort(arm4)
-  library(openxlsx)
-  write_out = list(a1, a2, a3, a4)
-  names(write_out) = c("arm1", "arm2", "arm3", "arm4")
-  write_out = list(a1, a2)
-  names(write_out) = c("sANC", "gANC")
-
-  openxlsx::write.xlsx(write_out, file = here('consort_by_group.xlsx'), row.names = T)
-@
-
-
-<<ULTRASOUND, echo = F>>=
-    
-  library(openxlsx)
-  arm1 = df %>% filter(dhc %in% A1)
-  arm2 = df %>% filter(dhc %in% A2)
-  arm3 = df %>% filter(dhc %in% A3)
-  arm4 = df %>% filter(dhc %in% A4)
-  
-  df1 = get_elig(arm2, "analysis")
-  df2 = get_elig(arm4, "analysis")
-  
-  df1us = get_us_rates(df1)
-  df2us = get_us_rates(df2)
-  
-  #train = make_data(df1us, df2us, "binomial", wk_thresh = 20)
-  out2 = output_ptb_rate(df1us)
-  out4 = output_ptb_rate(df2us)
-
-  out = list(out2, out4)
-  names(out) = c("arm2", "arm4")
-  write.xlsx(out, file = sprintf("us_among_elig_primary_analysis_%s.xlsx", Sys.Date()), row.names = T)
-  
-@
-
-<<get_nancy_number, echo = F>>=
-library(dplyr)
-df1 = arm1 %>% filter(arm1$eligible == 1 & arm1$deliveredbyMarch_31_2019 == 1)
-dim(df1)
-df1 = df1 %>% filter(!is.na(validgestatdel))
-
-df2 = arm2 %>% filter(arm2$eligible == 1 & arm2$deliveredbyMarch_31_2019 == 1)
-df2 = df2 %>% filter(!is.na(validgestatdel))
-nrow(df2) + nrow(df1)
-
-@
 
 \bigskip
 {\sffamily \textbf{R and package versions used}}

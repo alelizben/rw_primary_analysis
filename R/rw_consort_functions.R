@@ -18,7 +18,10 @@ get_elig = function(df, type) {
   
   enroll_date = as.Date(df$enroll_date, format = "%m/%d/%Y")
   anc1date = as.Date(df$anc1date_anc, format = "%m/%d/%Y")
-
+  
+  #enroll_date >=  "2017-05-22" & 
+  #anc1date >=  "2017-05-22" & 
+  #| (anc1date <= "2018-10-31")
   valid_enroll = (enroll_date >=  "2017-05-22") & (enroll_date <= "2018-10-31") 
   valid_anc = (anc1date >=  "2017-05-22") & (anc1date <= "2018-10-31")
   #df$valid_enroll = valid_enroll == T
@@ -51,20 +54,34 @@ get_elig = function(df, type) {
   }
   ## is possible for one of these to be not valid date
   df = df %>% filter(valid_enroll | valid_anc)
-
+  
+  #df$enroll_but_no_anc1 = (!is.na(df$enroll_date) & is.na(df$anc1date_anc))
+  
+  ###anc1_ga_lt_24_weeks
+  
+  #df$anc_ga_lt_24_wks = df$anc1ga_anc <= 24 & (df$enroll_but_no_anc1 == F)
   df$anc_ga_lt_24_wks = df$anc1ga_anc <= 24 
   summary(df$anc_ga_lt_24_wks)
   ## subset ##
   elig_enroll = df %>% filter(anc_ga_lt_24_wks == TRUE)
   elig_enroll = elig_enroll %>% filter(NumberANCs >= 2)
   dim(elig_enroll)
-
+  
+  # t = df %>% filter(eligible == 1)
+  # table(t$NumberANCs >=4 )
+  # mean(t$NumberANCs)
+  # mean(t$anc1ga_anc < 16, na.rm = T)
+  # mean(t$NumberANCs >= 4)
+  # 
   
   if (type == "elig_enroll") {
     return(elig_enroll)
   }
   
-
+  # subset ##
+  
+  ## MOTHER BABY PAIRS ##
+  #deliver_within_study_w_valid_ga_2_anc
   elig_enroll$date_del = as.Date(elig_enroll$date_delivery_mat, format = "%m/%d/%Y")
   elig_enroll$lmp = as.Date(elig_enroll$lmp_anc, format = "%m/%d/%Y")
   elig_enroll$ga_at_del_by_lmp = as.numeric((elig_enroll$date_del - elig_enroll$lmp)/7)
@@ -91,7 +108,11 @@ get_elig = function(df, type) {
   table(ltfu, useNA = "always")
 }
 
-
+#df1 = get_elig(arm1, "elig_anc")
+#Proportion of women who attended at least 4 ANC visits
+#Proportion of women who attended ANC 1 before 16 completed weeks GA
+#Mean number of ANC visits attended per woman, in number of visits
+#Mean GA at first ANC visit, in weeks
 get_anc_covg = function(x){
 
   n_anc1ga = sum(!is.na(x$anc1ga_anc)) 
@@ -112,6 +133,124 @@ get_anc_covg = function(x){
   
   out
 }
+
+
+get_consort = function(df, ga_type) {
+  #eligible_enroll_date
+  #anc1_date = as.Date(df$anc1date_anc, format = "%m/%d/%Y")
+  enroll_date = as.Date(df$enroll_date, format = "%m/%d/%Y")
+  valid_enroll = enroll_date >=  "2017-05-22" & enroll_date <= "2018-10-31"
+  df$valid_enroll = valid_enroll == T
+  elig_enroll_date = table(df$valid_enroll, useNA = 'always')
+  dates = subset(df, select = c(anc1date_anc, date_ancfuvst_2,
+                                date_ancfuvst_2b, date_ancfuvst_2c, date_ancfuvst_2d))
+  number_missing = is.na(dates)
+  number_missing_dates = rowSums(number_missing)
+  df$number_anc = 5 - number_missing_dates
+  
+  
+  df$anc1ga_anc = as.numeric(as.character(df$anc1ga_anc))
+  ##departed after without clinic visit
+  df = df %>% filter(valid_enroll == T)
+  
+  df$enroll_but_no_anc1 = (!is.na(df$enroll_date) & is.na(df$anc1date_anc))
+  departed_without_clinic = table(df$enroll_but_no_anc1, useNA = "always")
+  (departed_without_clinic)
+  
+  ###anc1_ga_lt_24_weeks
+  
+  df$anc_ga_lt_24_wks = df$anc1ga_anc <= 24 & (df$enroll_but_no_anc1 == F)
+  anc1_ga_lt_24 = table(df$anc_ga_lt_24_wks, useNA = 'always')
+  anc1_ga_lt_24
+  ### type in consort 
+  #anc1_ga_lt_24_valid_enroll_date = table((df$valid_anc1 == T & !is.na(df$anc_ga_lt_24_wks) &
+  #                                         df$anc_ga_lt_24_wks == T), useNA = "always")
+  
+  out_elig_enroll = data.frame(rbind(elig_enroll_date, departed_without_clinic, anc1_ga_lt_24))
+  
+  ## subset ##
+  elig_enroll = df %>% filter(anc_ga_lt_24_wks)
+  table(elig_enroll$anc1ga_anc < 16, useNA = "always")/nrow(elig_enroll)
+  ## subset ##
+  
+  ## MOTHER BABY PAIRS ##
+  #deliver_within_study_w_valid_ga_2_anc
+  elig_enroll$date_del = as.Date(elig_enroll$date_delivery_mat, format = "%m/%d/%Y")
+  elig_enroll$lmp = as.Date(elig_enroll$lmp_anc, format = "%m/%d/%Y")
+  elig_enroll$ga_at_del_by_lmp = as.numeric((elig_enroll$date_del - elig_enroll$lmp)/7)
+  
+  elig_enroll$valid_ga_recorded = elig_enroll$ga_weeks >= 20 & elig_enroll$ga_weeks <= 44
+  elig_enroll$valid_ga_lmp = elig_enroll$ga_at_del_by_lmp >= 20 & elig_enroll$ga_at_del_by_lmp <= 44
+  ##all should be valid recorded GA
+  valid_recorded_ga_del = c(table(elig_enroll$valid_ga_recorded, useNA = "always"), 0)[c(3,1,2)]
+  names(valid_recorded_ga_del)[1] = FALSE
+  valid_ga_lmp_del = table(elig_enroll$valid_ga_lmp, useNA = "always")
+  
+  delivered_before_march_31 = table(elig_enroll$date_del <= "2019-03-31", useNA = "always")
+  delivered_before_march_31
+  
+  ## did not deliver within study period or didn't deliver at all 2271 + 91 
+  ## did not have >= 2 visits+ 674
+  ## did not have valid gestatdel + 116
+  delivered_out = elig_enroll %>% filter(date_del > "2019-03-31" | is.na(date_del) )
+  elig = (delivered_out$anc1ga_anc <= 24 & delivered_out$number_anc >= 2)
+  anc_lt_24_and_2_anc_visits_del_out = table(elig, useNA = 'always')
+  
+  
+  elig_enroll = elig_enroll %>% filter(date_del <= "2019-03-31") 
+  elig = (elig_enroll$anc1ga_anc <= 24 & elig_enroll$number_anc >= 2)
+  
+  anc_lt_24_and_2_anc_visits = table(elig, useNA = 'always')
+  
+  elig_mother_baby = elig_enroll %>% filter(elig == T) 
+  table(elig_mother_baby$valid_ga_lmp, useNA = 'always')
+  
+  ### NA COME FROM MOSTLY GA RECORDED
+  ltfu = ((!is.na(elig_mother_baby$valid_ga_lmp) & elig_mother_baby$valid_ga_lmp == T | !is.na(elig_mother_baby$valid_ga_recorded) & elig_mother_baby$valid_ga_recorded == T ))
+  ltfu = ( elig_mother_baby$valid_ga_lmp == T | elig_mother_baby$valid_ga_recorded == T )
+  
+  ##consort diag
+  
+  sum(is.na(elig_mother_baby$valid_ga_lmp) | elig_mother_baby$valid_ga_lmp == F)
+  sum(is.na(elig_mother_baby$valid_ga_recorded))
+  sum(elig_mother_baby$valid_ga_recorded == F, na.rm = T)
+  
+  ## 50 where both are NA
+  sum(is.na(elig_mother_baby$valid_ga_lmp) & is.na(elig_mother_baby$valid_ga_recorded))
+  sum(elig_mother_baby$valid_ga_lmp == F & is.na(elig_mother_baby$valid_ga_recorded), na.rm = T)
+  #### this adds up to 116!!!!!!!
+  ##either BOTH are NA OR when valid_ga_lmp is false, there no ga recorded to compensate. 
+  table(elig_mother_baby$valid_ga_recorded[elig_mother_baby$valid_ga_lmp == F], useNA = "always")
+  table(elig_mother_baby$valid_ga_recorded[is.na(elig_mother_baby$valid_ga_lmp)], useNA = "always")
+  
+  summary(elig_mother_baby$ga_at_del_by_lmp)
+  sum(elig_mother_baby$ga_at_del_by_lmp < 20, na.rm = T)
+  sum(elig_mother_baby$ga_at_del_by_lmp >= 44, na.rm = T)
+  table(elig_mother_baby$valid_ga_lmp, useNA ='always')
+  table(elig_mother_baby$valid_ga_recorded, useNA ='always')
+  ##consort diagram
+  
+  attained_outcome = c(table(ltfu, useNA = 'always'), 0)[c(3, 1, 2)]
+  attained_outcome
+  names(attained_outcome)[1] = "FALSE"
+  
+  #df_16 = df %>% filter(anc1ga_anc <= 16 & number_anc >= 2)
+  
+  #valid_recorded_ga_del, valid_ga_lmp_del, 
+  out_elig_mother_baby = data.frame(rbind(delivered_before_march_31, 
+                                          anc_lt_24_and_2_anc_visits_del_out,
+                                          anc_lt_24_and_2_anc_visits,
+                                          attained_outcome))
+  
+  #out_elig_enroll, 
+  out = rbind(out_elig_enroll, out_elig_mother_baby)
+  out$total = rowSums(out)
+  
+  out
+  
+  
+}
+
 
 
 output_ptb_rate = function(df) {
@@ -157,19 +296,74 @@ output_ptb_rate = function(df) {
   out
 }
 
+output_ptb = function(df) {
+  out  = NULL
+
+  out$mean_ga_deliv = get_n(df$validgestatdel)
+
+  out$ga_lt_37 = get_n(df$validgestatdel < 37)
+  #out$lbw_2500 = get_n(df$weight < 2500)
+  
+  out$mean_ga_anc1_back_calc = get_n(df$back_calc_dod_ga_recorded)
+  out$mean_ga_anc1_lmp = get_n(df$ga_at_anc1_by_lmp)
+ 
+
+  out = do.call(rbind, out)
+  out
+}
 
 
 get_ga_us= function(df){
-
+  ## point of 2anc , <24 wks, enrolled, delivered march, mothers age
+  ## additional us data that's being collected
+  
+  # library(openxlsx)
+  # out = list(out2, out4)
+  # names(out) = c("arm2", "arm4")
+  # write.xlsx(out, file = "ptb_rates_us_rec.xlsx")
+  
+  table(arm4$us_rec, useNA = "always")
+  
+  ##us_rec
+  
+  ##by us_edd
+  summary(as.numeric(us_2$ga_del_us))
+  summary(as.numeric(us_4$ga_del_us))
+  sum(as.numeric(us_2$ga_del_us) < 2, na.rm = T)
+  sum(as.numeric(us_4$ga_del_us) < 2, na.rm = T)
+  sum(as.numeric(us_2$ga_del_us) > 45, na.rm = T)
+  sum(as.numeric(us_4$ga_del_us) > 45, na.rm = T)
+  
+  ## by us_date and ga at US
+  summary(as.numeric(us_2$ga_del_by_us_date))
+  summary(as.numeric(us_4$ga_del_by_us_date))
+  sum(as.numeric(us_2$ga_del_by_us_date) < 2, na.rm = T)
+  sum(as.numeric(us_4$ga_del_by_us_date) < 2, na.rm = T)
+  sum(as.numeric(us_2$ga_del_by_us_date) > 45, na.rm = T)
+  sum(as.numeric(us_4$ga_del_by_us_date) > 45, na.rm = T)
+  
   
   df2_edd = us_2 %>% filter(ga_del_us >= 10 & ga_del_us <= 44)
   df4_edd = us_4 %>% filter(ga_del_us >= 10 & ga_del_us <= 44)
-
+  
+  dim(df2_edd)
+  dim(df4_edd)
+  sum(!is.na(df2_edd$ga_del_by_us_date))
+  sum(!is.na(df2_edd$ga_del_us))
+  sum(!is.na(df4_edd$ga_del_by_us_date))
+  sum(!is.na(df4_edd$ga_del_us))
+  
   ##this provides bigger gap for using ga_del_by_us_date
   df2_usd = us_2 %>% filter(ga_del_by_us_date >= 10 & ga_del_by_us_date <= 43)
   df4_usd = us_4 %>% filter(ga_del_by_us_date >= 10 & ga_del_by_us_date <= 43)
   
-
+  dim(df2_usd)
+  dim(df4_usd)
+  sum(!is.na(df2_usd$ga_del_by_us_date))
+  sum(!is.na(df2_usd$ga_del_us))
+  sum(!is.na(df4_usd$ga_del_by_us_date))
+  sum(!is.na(df4_usd$ga_del_us))
+  
   
   ptb_usd2 = as.numeric(df2_usd$ga_del_by_us_date) < 37
   ptb_usd4 = as.numeric(df4_usd$ga_del_by_us_date) < 37
@@ -198,7 +392,12 @@ get_ga_us= function(df){
   ptb_edd_usd = c(get_n(ptb_edd_usd2), get_n(ptb_edd_usd4))
   ga_edd_usd = c(get_n(df2_edd$ga_del_by_us_date), get_n(df4_edd$ga_del_by_us_date))
   
-
+  ##gestatdelbylmp
+  ##ptbcalc
+  ##ptbcalc2
+  ##ptbcalc3
+  ##ptbcalc_byLMP
+  ##ptbcalc_US
   all_ptb2 = us_2$ga_weeks_recorded < 37 & us_2$weight >=2500 & us_2$weight <=2999 | us_2$weight < 2500
   all_ptb4 = us_4$ga_weeks_recorded < 37 & us_4$weight >=2500 & us_4$weight <=2999 | us_4$weight < 2500
   #ptb_all2 = as.numeric(as.character(us_2$ga_weeks_recorded)) < 37
@@ -209,11 +408,104 @@ get_ga_us= function(df){
   ga_all4 = get_n(as.numeric(as.character(us_4$ga_weeks_recorded)))
   ga_all = c(ga_all2, ga_all4)
   
- 
+  # sum(is.na(df2_ptb))
+  # ptb_usd_edd, ptb_edd, ptb_edd_usd,
+  #ga_usd_edd, ga_edd, ga_edd_usd,
+  # ptb_rec_usd, ptb_rec_edd,
+  # ga_rec_usd, ga_rec_edd,
   out_ptb = (data.frame(rbind(ptb_usd, ptb_all)))
   out_ga = data.frame(rbind(ga_usd, ga_all))
   names(out_ptb) = c("std. anc", "grp anc")
   names(out_ga) = c("std. anc", "grp_anc")
+  out_ptb
+  out_ga
   return(out)
+}
+
+make_analysis_data = function(df, usupt) {
+  
+  arm1 = df %>% filter(dhc %in% A1 | dhc %in% A3)
+  arm2 = df %>% filter(dhc %in% A2 | dhc %in% A4)
+  
+  df_all = data.frame(rbind(arm1, arm2))
+  
+  
+  df_all$id = as.numeric(df_all$dhc)
+  df_all$stat_weight = 1/nrow(df_all)
+  
+  df_all$Y = df_all$validgestatdel
+  table(df_all$NumberANCs)
+  df_all$at_least_4 = df_all$NumberANCs >= 4
+  df_all$at_least_3 = df_all$NumberANCs >= 3
+  df_all$ga_lt_16 = df_all$anc1ga_anc <= 16
+  table(df_all$ga_lt_16)
+  
+  if (usupt) {
+    df_all$A <- df_all$InUSUPTarm
+    df_all$Pair = df_all$Pair_USUPT
+    
+  } else {
+    #df_all$A <- df_all$StudyGrp
+    df_all$A <- df_all$studygrp
+  }
+  # data = subset(df_all, select = c(validgestatdel, at_least_4, ga_lt_16, 
+  #                                  at_least_3, NumberANCs, anc1ga_anc, 
+  #                                  stat_weight, A, id, Pair, Pair_USUPT, quad, 
+  #                                  ga_del_by_us_date, 
+  #                                  weight,
+  #                                  InUSUPTarm, StudyGrp, StudyArm))
+  #for US GEE
+  data = subset(df_all, select = c(validgestatdel, at_least_4, ga_lt_16, 
+                                   at_least_3, NumberANCs, anc1ga_anc, 
+                                   stat_weight, A, id, dhc, Pair, 
+                                   ga_del_by_us_date, 
+                                   weight))
+  table(data$A, data$Pair)
+  return(data)
+  
+}
+
+
+
+make_analysis_data = function(df, usupt) {
+  
+  arm1 = df %>% filter(dhc %in% A1 | dhc %in% A3)
+  arm2 = df %>% filter(dhc %in% A2 | dhc %in% A4)
+  
+  df_all = data.frame(rbind(arm1, arm2))
+  
+  
+  df_all$id = as.numeric(df_all$dhc)
+  df_all$stat_weight = 1/nrow(df_all)
+  
+  df_all$Y = df_all$validgestatdel
+  table(df_all$NumberANCs)
+  df_all$at_least_4 = df_all$NumberANCs >= 4
+  df_all$at_least_3 = df_all$NumberANCs >= 3
+  df_all$ga_lt_16 = df_all$anc1ga_anc <= 16
+  df_all$ga_lt_14 = df_all$anc1ga_anc <= 14
+  table(df_all$ga_lt_16)
+  
+  if (usupt) {
+    df_all$A <- df_all$InUSUPTarm
+    df_all$Pair = df_all$Pair_USUPT
+    
+  } else {
+    df_all$A <- df_all$StudyGrp
+    #df_all$A <- df_all$studygrp
+  }
+  # data = subset(df_all, select = c(validgestatdel, at_least_4, ga_lt_14,
+  #                                  at_least_3, NumberANCs, anc1ga_anc,
+  #                                  stat_weight, A, id, dhc, Pair, Pair_USUPT, quad,
+  #                                  ga_del_by_us_date,
+  #                                  weight, stat_weight,
+  #                                  InUSUPTarm, StudyGrp, StudyArm))
+  #for US GEE
+  data = subset(df_all, select = c(validgestatdel, at_least_4, ga_lt_14,
+                                   at_least_3, NumberANCs, anc1ga_anc,
+                                   ga_del_by_us_date,
+                                   stat_weight, weight, A, id, dhc, Pair))
+  table(data$A, data$Pair)
+  return(data)
   
 }

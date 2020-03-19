@@ -31,12 +31,13 @@ Alejandra Benitez and the Preterm Birth Initiative
 %This particular document is written with \href{http://www.latex-project.org}{LaTeX}.
 
 <<knitr_options, include=FALSE>>=
-library(knitr)
-library(here)
-library(dplyr)
-library(geepack)
-library(parsedate)
-library(ggplot2)
+  library(knitr)
+  library(here)
+  library(dplyr)
+  library(geepack)
+  library(parsedate)
+  library(ggplot2)
+  library(openxlsx)
 opts_chunk$set(fig.width=12, fig.height=4, fig.path='RnwFigs/',
 warning=FALSE, message=FALSE, tidy=FALSE)
 options(width=60)
@@ -45,31 +46,22 @@ set.seed(53079239)
 if(!require("qtl")) install.packages("qtl", repos="http://cran.us.r-project.org")
 @
 
-\bigskip
-%\sffamily 
-\textbf{Abstract}
-\newline
-
 
 
 <<load_data, echo=TRUE>>=
 ## marginal probability of weeks
-
-df = read.csv(here('data', 'ARMS1_2__3Corrected_4FinalAnalysisV4ConsentedLabelledRecodedOutliersMATERNALFACILITY24Sep2019WMatWtFU.csv'))
 df = read.csv(here('data', "MatCohort_USadded_30Oct19_BP.csv"))
 df[df == "#NULL!" | df == " " | df == ""] <- NA
 id_arm = read.csv(here('data', 'RW_Study_ID.csv'))
-table(df$ubudehe_cat)
 
-table(x$obhx_preterm, x$hx_ptdlvry)
-summary(x$enroll_obhx___1)
+
 ##split into arms
 @
 
 
 <<echo=FALSE, cache=FALSE>>=
-source(here('code', "rw_consort_functions.R"))
-source(here('code', "ga_pred", "functions.R"))
+source(here('R', "rw_consort_functions.R"))
+source(here('ga_pred_files', "functions.R"))
 @
 
 
@@ -85,6 +77,7 @@ arm2 = df %>% filter(dhc %in% A2)
 arm3 = df %>% filter(dhc %in% A3)
 arm4 = df %>% filter(dhc %in% A4)
 
+
 @
 
 
@@ -92,6 +85,7 @@ arm4 = df %>% filter(dhc %in% A4)
 <<get_us_table_7, echo = F>>=
   #eligible_only = df %>% filter(eligible == 1 )
   eligible = df %>% filter(eligible == 1 & deliveredbyMarch_31_2019 )
+  #eligible = df %>% filter(delivered == 1); analysis = eligible
   analysis = eligible %>% filter(!is.na(validgestatdel))
 
   #df2us = get_us(arm2, 2)
@@ -104,46 +98,67 @@ arm4 = df %>% filter(dhc %in% A4)
   us_arm = get_us(rbind(arm2, arm4), 4)
   
   all_arms = rbind(no_us, us_arm)
-
-  by_study_grp = (split(all_arms, all_arms$studygrp))
-  by_arm = lapply(split(us_arm, us_arm$studyarm), function(j) j %>% filter(ga_at_us >= 6 & ga_at_us <= 22))
-  lapply(by_study_grp, nrow)
-  lapply(by_arm, nrow)
+  # %>% filter(ga_at_us >= 6 & ga_at_us <= 22)
+  
+  by_study_grp = lapply(split(all_arms, all_arms$StudyGrp), 
+                        function(j) j %>% filter(ga_at_us >= 6 & ga_at_us <= 22))
+  by_arm = lapply(split(us_arm, us_arm$StudyArm), 
+                  function(j) j %>% filter(ga_at_us >= 6 & ga_at_us <= 22))
 
   get_us_stats = function(df) {
     
+    df$weight[df$weight == 33] <- 3300
+    df$weight[df$weight == 34] <- 3400
+    df$weight[df$weight == 35] <- 3500
+    df$weight[df$weight == 36] <- 3600
+    df$weight[df$weight == 50] <- 5000
+    df$weight[df$weight == 300] <- 3000
     out = c()
-    out$ga_at_birth_mat_register = df$val_ga
-    out$ga_at_birth_early_us = ifelse(!is.na(df$ga_del_by_us_date) &
-                                        df$ga_at_us >=6 & df$ga_at_us <= 22, df$ga_del_by_us_date, NA)
-    out$ga_at_birth_by_ga_anc1 = df$ga_at_delivery_by_ga_anc1
+    out$validgestatdel = df$val_ga < 37
+    out$recorded_register = df$recorded < 37
+    out$ga_at_birth_by_ga_anc1 = df$ga_at_delivery_by_ga_anc1 < 37
+    out$ga_at_deliv_lmp = df$ga_at_deliv_lmp < 37
+ 
     
-    out$ptb_by_mat_reg = df$ga_weeks < 37
-    out$ptb_by_early_us = ifelse(!is.na(df$ga_del_by_us_date) &
-                                        df$ga_at_us >=6 & df$ga_at_us <= 22, df$ga_del_by_us_date < 37, NA)
-    
-    out$ga_anc1_register = df$ga_anc1_recorded
-    out$ga_anc1_early_US = ifelse(!is.na(df$ga_at_us) &
-                                        df$ga_at_us >=6 & df$ga_at_us <= 22, (df$ga_at_us - df$wks_from_anc1_to_us), NA)
-    out$ga_anc1_back_calc_deliv = df$back_calc_dod_ga_recorded
-    
+    out$ptb_by_bwt_or_wks = df$validgestatdel < 37 | df$weight < 2500
+    out$low_bwt_only = df$weight < 2500
+
+    out$ptb_by_early_us = ifelse(!is.na(df$ga_del_by_us_date) & df$ga_at_us >=6 & df$ga_at_us <= 22,
+                                 df$ga_del_by_us_date < 37, NA)
+
     out = lapply(out, get_n)
     out = do.call(rbind, out)
     out
   }
+  us_only = get_us_stats(us_arm %>% filter(ga_at_us <= 22))
+  colnames(us_only) <- "ptb rate"
   
-  lapply(by_study_grp, nrow)
-  by_arm_res = do.call(cbind, lapply(by_arm, get_us_stats))
+  all = get_us_stats(all_arms)
+  colnames(all) <- "ptb rate"
+  #t2 = output_ptb_rate(all_arms)
+  us_and_all = list(us_only, all)
+
+  names(us_and_all) = c('us_only', "all")
+  
   study_grp_res = do.call(cbind, lapply(by_study_grp, get_us_stats))
-  write.csv(cbind(study_grp_res, by_arm_res), file = "us_table1_supplement.csv")
+  by_arm_res = do.call(cbind, lapply(by_arm, get_us_stats))
+  #write.csv( by_arm_res, file = sprintf("us_table1_supplement_%s.csv", Sys.Date()))
+  #write.xlsx(us_and_all, file = sprintf("us_and_all_ptb_rates_%s.xlsx", Sys.Date()), row.names = T)
 @
 
-
-
 <<ULTRASOUND, echo = F>>=
+  
+  eligible = df %>% filter(eligible == 1 & deliveredbyMarch_31_2019 )
+  #eligible = df %>% filter(delivered == 1); analysis = eligible
+  analysis = eligible %>% filter(!is.na(validgestatdel))
+  
+  arm1 = analysis %>% filter(dhc %in% A1)
+  arm2 = analysis %>% filter(dhc %in% A2)
+  arm3 = analysis %>% filter(dhc %in% A3)
+  arm4 = analysis %>% filter(dhc %in% A4)
+ 
   df2 = get_elig(arm2, "elig_enroll")
   df4 = get_elig(arm4, "elig_enroll")
-# 
   df1 = get_elig(arm1, "elig_enroll")
   df3 = get_elig(arm3, "elig_enroll")
   
@@ -155,196 +170,87 @@ arm4 = df %>% filter(dhc %in% A4)
   df1_ga = df1us %>% filter(back_calc_dod_ga_recorded >= 6 & back_calc_dod_ga_recorded <= 22)
   df3_ga = df3us %>% filter(back_calc_dod_ga_recorded >= 6 & back_calc_dod_ga_recorded <= 22)
   
-  df2_ga = df2us %>% filter(ga_at_us >=6 & ga_at_us <= 22)
-  df4_ga = df4us %>% filter(ga_at_us >=6 & ga_at_us <= 22)
+  df2_ga = df2us %>% filter(ga_at_us >= 6 & ga_at_us <= 22)
+  df4_ga = df4us %>% filter(ga_at_us >= 6 & ga_at_us <= 22)
+  
   ## for actual SL, make_data needs to filter out any facilities w <11 obs, check dates and completion of data
   ## currently this is not implemented for larger summary of sample
   train = make_data(df2_ga, df4_ga, "binomial", wk_thresh = 22, 2)
-
-  #train = train %>% filter(ga_at_us >= 6)
-  summary(train$ga_at_us)
-#traing = make_data(us_2, us_4, "gaussian", wk_thresh = 20)
-  train$Arm = ifelse(train$dhc %in% A2, "US_stANC", "US_gANC")
-  table(train$Arm)
-#table(ifelse(trainb$dhc %in% A4, "stANC", "gANC"))
-  by_arm = split(train, train$Arm)
-  by_arm = lapply(by_arm, output_ptb_rate)
-
-  by_arm$Arm1 = get_n(df1_ga$back_calc_dod_ga_recorded)
-  by_arm$Arm3 = get_n(df3_ga$back_calc_dod_ga_recorded)
-  library(openxlsx)
-  write.xlsx(by_arm, file = "ga_us_and_back_calc_16-22wks.xlsx", row.names = T)
-@
-
-<<make_plots, echo = F >>=
-
-plot_data = subset(train, select = c(Arm, dhc, mother_age_cat, ga_del_by_us_date, ga_del_by_us_edd, 
-                                     ga_at_deliv_lmp, ga_weeks_recorded, m_age_enroll))
-plot_data = plot_data[complete.cases(plot_data), ]
-#summary(plot_data$ga_del_by_us_date)
-#summary(plot_data$ga_weeks_recorded)
-plot_data$ga_weeks_cts = plot_data$ga_weeks_recorded + rnorm(nrow(plot_data), 0, 0.15) 
-summary(plot_data$ga_weeks_cts)
-
-gaPlot <- ggplot(plot_data, aes(ga_weeks_cts, ga_del_by_us_date, colour = Arm)) +
-  stat_smooth(aes(group=1),method="lm", se=TRUE, linetype="dashed", size = 0.5) + 
-  geom_point(size = 1.5, alpha = 0.3)  + 
-  geom_abline(slope = 1, intercept = 0, linetype = "dashed", size = 0.2, alpha = 0.5)
-# + geom_jitter(height = 0.1, width = 0.1, alpha = 0.3)
-
-gaPlot + ggtitle(sprintf("Gestational Age at Delivery, N = %s", nrow(plot_data))) + 
-  labs(x = "Recorded in Maternity Register (wks)", y="By US Date (wks)")
-lm(formula = ga_del_by_us_date ~ ga_weeks_cts, plot_data)
+  
+  eligible_studygrp = make_analysis_data(train, usupt = F)
+  
+  fix_weight = function(df) {
+    
+    df$weight[df$weight == 33] <- 3300
+    df$weight[df$weight == 34] <- 3400
+    df$weight[df$weight == 35] <- 3500
+    df$weight[df$weight == 36] <- 3600
+    df$weight[df$weight == 50] <- 5000
+    df$weight[df$weight == 300] <- 3000
+    out = c()
+    
+    df$ptb_by_early_us = ifelse(!is.na(df$ga_del_by_us_date),
+                                 df$ga_del_by_us_date < 37, NA)
+    df$ga_del_by_us_date = as.numeric(df$ga_del_by_us_date)
+    df$lbw = ifelse(!is.na(df$weight),
+                                 df$weight < 2500, NA)
+    df
+  }
+  out = fix_weight(eligible_studygrp)
+  out = out %>% filter(Pair != 2 & Pair != 4)
 
 
 @
 
-<<SuperLearner, echo  = F>>=
-lib.g = list( "SL.xgboost", "SL.ranger", "SL.glmnet", "SL.bartMachine")
-lib.b = list( "SL.xgboost", "SL.randomForest", "SL.ranger", "SL.glmnet", "SL.bartMachine2")
-
-#train$y = as.numeric(train$ga_del_by_us_date < 37)
-train$y = as.numeric(train$ga_del_by_us_date)
-
-train$m_del = as.factor(format(train$date_del, "%m"))
-train$m_age_cat = as.factor(train$mother_age_cat)
-X = make_x(train)
-summary(X)
-
-library(SuperLearner)
-start_time = Sys.time()
-#gaussian model
-out_all = CV.SuperLearner(Y = train$y, X = X, family = gaussian(), 
-                      cvControl = list(V = 5, shuffle = T, validRows = NULL),
-                      innerCvControl = list(list(V = 5)),
-                       method = "method.NNLS", SL.library = lib.g)
-
-out_binom = CV.SuperLearner(Y = as.numeric(train$y < 37), X = X, family = binomial(), 
-                      cvControl = list(V = 5, shuffle = T, validRows = NULL, stratifyCV = T),
-                      innerCvControl = list(list(V = 5)),
-                      method = "method.NNloglik", SL.library = lib.b)
 
 
-out_recorded = CV.SuperLearner(Y = as.numeric(plot_data$ga_del_by_us_date), 
-                      X = data.frame(plot_data$ga_weeks_recorded, plot_data$dhc), 
-                      family = gaussian(), 
-                      cvControl = list(V = 5, shuffle = T, validRows = NULL),
-                      innerCvControl = list(list(V = 5)),
-                       method = "method.NNLS", SL.library = lib.g)
-out_recorded_binom = CV.SuperLearner(Y = as.numeric(plot_data$ga_del_by_us_date < 37), 
-                        X = data.frame(plot_data$ga_weeks_recorded, plot_data$dhc), 
-                        family = binomial(), 
-                      cvControl = list(V = 5, shuffle = T, validRows = NULL, stratifyCV = T),
-                      innerCvControl = list(list(V = 5)),
-                      method = "method.NNloglik", SL.library = lib.b)
+<<test_using_gee, echo = F>>=
 
-get_auc(out_binom, data.frame(y = as.numeric(train$y < 37)), 5, "ML Algorithm for Predicting Preterm Birth", type = "sens")
-get_auc(out_recorded_binom, data.frame(y = as.numeric(plot_data$ga_del_by_us_date < 37)), 5, "Register-Recorded GA for Predicting Preterm Birth", type = "sens")
+  do_gee = function(df) {
 
-get_auc(out_binom, data.frame(y = as.numeric(train$y < 37)), folds = 5, type = "sens",  name= "")
+    gee.fit1 <- geese(formula(ga_del_by_us_date ~ A + Pair), id= id, data= df[order(df$id),], 
+                  family = gaussian(link ="identity"), corstr="exch")
+    gee.fit2 <- geese(formula(ptb_by_early_us ~ A + Pair), id= id, data= df[order(df$id),], 
+                    family = binomial(link ="logit"), corstr="exch")
+    gee.fit3 <- geese(formula(lbw ~ A + Pair), id= id, data= df[order(df$id),], 
+                    family = binomial(link ="logit"), corstr="exch")
 
-get_auc(out_recorded_binom, data.frame(y = as.numeric(plot_data$ga_del_by_us_date < 37)), 
-                                       type = "sens",
-                                       folds = 5, name= "")
+    list(summary(gee.fit1)$mean[2, c(1,2,4)], summary(gee.fit2)$mean[2, c(1,2,4)], summary(gee.fit3)$mean[2, c(1,2,4)])
+  }
+  
+  do_gee(out)
+  
+@
+
+
+
+<<aggregate_outcomes, echo = F>>=
+  ## for 
+
+  aggregate_cluster = function(df) {
+    by_arm = split(df, df$A)
+    pooled = lapply(by_arm, function(x) c(get_n(x$ga_del_by_us_date), get_n(x$ptb_by_early_us), get_n(x$lbw)))
+    agg = aggregate(subset(df, select = c(id, A, ga_del_by_us_date, ptb_by_early_us, lbw)), 
+                    by = list(id = df$id), FUN = function(x) mean(x, na.rm = T))
+    by_arm = split(agg, agg$A)
+    clustered = lapply(by_arm, function(j) apply(subset(j, select = c(ga_del_by_us_date, ptb_by_early_us, lbw)), 2, 
+                                            function(x) round(c(mean(x), sd(x)), 4) ) )
+
+           
+    clustered[[1]] = rbind(clustered$`0`, pooled$`0`)
+    row.names(clustered[[1]]) = c("estimated cluster_adj", "sd cluster adj", "pooled estimate (n)")
+    clustered[[2]] = rbind(clustered$`1`, pooled$`1`, sapply(do_gee(df), function(j) round(j$p, 4)))
+    row.names(clustered[[2]]) = c("estimated cluster_adj", "sd cluster adj", "pooled estimate (n)", "p-values")
+
+    names(clustered) = c("control", "intervention")
+    # aggregate(analysis_study)
+    clustered
+    
+  }
+  #write.xlsx(aggregate_cluster(out), row.names = T, file = sprintf("supplemental_table_us_%s.xlsx", Sys.Date()))
 
 @
 
-<<plot_gaussian, echo = F>>=
-plot_data = subset(train, select = c(Arm, dhc, mother_age_cat, ga_del_by_us_date, ga_del_by_us_edd, 
-                                     ga_at_deliv_lmp, ga_weeks_recorded, m_age_enroll))
-plot_data = plot_data[complete.cases(plot_data), ]
-gaus_perf(out_recorded, data.frame(y = as.numeric(plot_data$ga_del_by_us_date)))
-
-##############
-#plot_data = plot_data[complete.cases(plot_data),]
-plot_data$predicted_recorded = out_recorded$SL.predict
-
-#((1-.148)/.148)/((1-.225)/.225)
-
-
-gaPlot <- ggplot(plot_data, aes(predicted_recorded, ga_del_by_us_date, colour = Arm)) +
-  stat_smooth(aes(group=1),method="lm", se=TRUE, linetype="dashed", size = 0.5) + 
-  geom_point(size = 1.5, alpha = 0.3)  + 
-  geom_abline(slope = 1, intercept = 0, linetype = "dashed", size = 0.2, alpha = 0.5)
-gaPlot + ggtitle(sprintf("Gestational Age at Delivery Predicted by Recorded Register GA, N = %s", nrow(plot_data))) +  labs(x = "Predicted by Recorded Register GA (wks)", y="By US Date (wks)")
-summary(lm(formula = ga_del_by_us_date ~ predicted_recorded, plot_data))
-
-
-plot_data = subset(train, select = c(Arm, dhc, mother_age_cat, 
-                                     ga_del_by_us_date, ga_del_by_us_edd, ga_at_deliv_lmp, 
-                                     ga_weeks_recorded, m_age_enroll))
-
-plot_data$predicted_all= out_all$SL.predict
-
-gaus_perf(out_all, train)
-
-
-gaPlot <- ggplot(plot_data, aes(predicted_all, ga_del_by_us_date, colour = Arm)) +
-  stat_smooth(aes(group=1),method="lm", se=TRUE, linetype="dashed", size = 0.5) + geom_point(size = 1.5, alpha = 0.3)  + 
-  geom_abline(slope = 1, intercept = 0, linetype = "dashed", size = 0.2, alpha = 0.5)
-gaPlot + ggtitle(sprintf("Gestational Age at Delivery Predicted by ML Algorithm, N = %s", nrow(plot_data))) +  labs(x = "Predicted by ML (wks)", y="By US Date (wks)")
-summary(lm(formula = ga_del_by_us_date ~ predicted_all, plot_data))
-
-
-@
-
-<<PTB_rate, echo = F>>=
-
-plot_data = subset(train, select = c(Arm, dhc, mother_age_cat, ga_del_by_us_date, ga_del_by_us_edd, weight,
-                                     ga_at_deliv_lmp, ga_weeks_recorded, m_age_enroll))
-
-ptb_rate_us_date = sapply(split(plot_data, plot_data$Arm), function(x) get_n(x$ga_del_by_us_date, cts = T))
-ptb_rate_us_date
-#summary(plot_data$predicted_recorded)
-
-thresh = get_auc(out_binom, data.frame(y = as.numeric(train$y < 37)), folds = 5, type = "sens",  name= "")[2]
-
-plot_data$predicted_bin = as.numeric(out_binom$SL.predict >= thresh)
-
-plot_data$predicted_cts = as.numeric(out_all$SL.predict)
-
-ptb_rate_us_predicted_bin = sapply(split(plot_data, plot_data$Arm), function(x) get_n(x$predicted_bin, cts = F))
-
-ptb_rate_us_predicted = sapply(split(plot_data, plot_data$Arm), function(x) get_n(x$predicted_cts, cts = T))
-
-plot_data$ku_algorithm_usdate = as.numeric(plot_data$weight > 1000 & plot_data$weight < 2500 | 
-                                      plot_data$weight >= 2500 & plot_data$weight <= 2999 & 
-                                      plot_data$ga_del_by_us_date < 37)
-plot_data$ku_algorithm_edd = as.numeric(plot_data$weight > 1000 & plot_data$weight < 2500 | 
-                                      plot_data$weight >= 2500 & plot_data$weight <= 2999 & 
-                                      plot_data$ga_del_by_us_edd < 37)
-plot_data$ku_algorithm_rec = as.numeric(plot_data$weight > 1000 & plot_data$weight < 2500 | 
-                                      plot_data$weight >= 2500 & plot_data$weight <= 2999 & 
-                                      plot_data$ga_weeks_recorded < 37)
-
-ptb_rate_ku_us = sapply(split(plot_data, plot_data$Arm), function(x) get_n(x$ku_algorithm_usdate, cts = F))
-
-ptb_rate_ku_edd = sapply(split(plot_data, plot_data$Arm), function(x) get_n(x$ku_algorithm_edd, cts = F))
-
-ptb_rate_ku_rec = sapply(split(plot_data, plot_data$Arm), function(x) get_n(x$ku_algorithm_rec, cts = F))
-
-
-ptb_rate_lmp =  sapply(split(plot_data, plot_data$Arm), function(x) get_n(x$ga_at_deliv_lmp, cts = T))
-
-
-plot_data = subset(train, select = c(Arm, dhc, mother_age_cat, ga_del_by_us_date, ga_del_by_us_edd, 
-                                     ga_at_deliv_lmp, ga_weeks_recorded, m_age_enroll))
-plot_data = plot_data[complete.cases(plot_data), ]
-
-ptb_rate_recorded = sapply(split(plot_data, plot_data$Arm), function(x) get_n(x$ga_weeks_recorded, cts = T))
-
-out = data.frame(rbind(ptb_rate_us_date, ptb_rate_us_predicted, ptb_rate_ku_us, ptb_rate_lmp, ptb_rate_recorded))
-
-write.csv(out, file = "us-rates_by_algorithm.csv")
-
-plot(traing$y, out$SL.predict, xlim = c(10,45), ylim = c(10,45), 
-     main = "Recorded vs. Predicted Gestational Age at Delivery (weeks)", 
-     xlab = "Recorded GA (US and LMP Based)", ylab = "Predicted")
-
-@
-\bigskip
-{\sffamily \textbf{R and package versions used}}
-\nopagebreak
 
 
 <<sessionInfo, include=TRUE, echo=TRUE, results='markup'>>=
