@@ -88,10 +88,11 @@ get_us = function(x, arm) {
   study_id = x[, sprintf('study_id_full_new')]
   val_ga = x$validgestatdel
   recorded = x$ga_weeks
+  Pair = x$Pair
 
   dhc = x$dhc
-  studygrp = x$StudyGrp
-  studyarm = x$StudyArm
+  StudyGrp = x$StudyGrp
+  StudyArm = x$StudyArm
   m_age_enroll = as.numeric(as.character(x[ ,'m_age']))
   m_age_anc1 = as.numeric(x[ ,'m_age_anc'])
   
@@ -234,15 +235,20 @@ get_us = function(x, arm) {
   back_calc_dod_ga_recorded = ga_weeks_recorded - wks_from_anc1_to_del
   
   usrec = x$us_rec
+  
+  anc1ga_anc = ga_anc1_recorded
+  NumberANCs = x$NumberANCs
 
   risk_factors = x %>% select(obhx_preterm, obhx_lbw, obhx_abortion, obhx_sb, obhx_28d_death)
   risk_factors[is.na(risk_factors)] <- 0
   sapply(risk_factors, table)
-  frame = data.frame(study_id, studygrp, studyarm, risk_factors, dhc, m_age_enroll, m_age_anc1, m_stature, m_wt, parity, grav, fuel, 
+  frame = data.frame(study_id, StudyGrp, StudyArm, Pair, risk_factors, dhc, m_age_enroll, 
+                     m_age_anc1, m_stature, m_wt, parity, grav, fuel, 
                      enough_food, ever_no_food,
                      run_out_food, not_enough_food, smoke, hh_smoker, alc, ubud,
                      lmp, date_anc1,
-                     usrec, ga_at_anc1_by_lmp, ga_anc1_by_edd, ga_anc1_recorded,
+                     usrec, ga_at_anc1_by_lmp, ga_anc1_by_edd, anc1ga_anc,
+                     NumberANCs,
                      fun_ht_anc1, edd, 
                      wks_from_anc1_to_del, wks_from_lmp_to_del, date_del, 
                      val_ga, recorded,
